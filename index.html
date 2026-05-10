@@ -2,13 +2,250 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=ceshi2.html">
-    <title>赤峰雅乐</title>
-    <script>
-        window.location.replace('ceshi2.html');
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赤峰雅乐 · 资源准备</title>
+    <style>
+        :root {
+            --gold: #d4af37;
+            --ink: #1f2937;
+            --muted: #667085;
+            --line: #dbe3ef;
+            --paper: #f7f9fc;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background:
+                radial-gradient(circle at 50% 8%, rgba(212, 175, 55, 0.14), transparent 28%),
+                linear-gradient(180deg, #ffffff 0%, #f3f6fb 100%);
+            color: var(--ink);
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+        }
+        .shell {
+            width: min(760px, calc(100vw - 36px));
+            padding: 44px 42px;
+            border: 1px solid rgba(212, 175, 55, 0.28);
+            border-radius: 30px;
+            background: rgba(255, 255, 255, 0.84);
+            box-shadow: 0 30px 90px rgba(31, 41, 55, 0.12);
+            text-align: center;
+        }
+        .kicker {
+            color: var(--gold);
+            letter-spacing: 0.5em;
+            font-size: 14px;
+            font-family: serif;
+            margin-bottom: 14px;
+        }
+        h1 {
+            margin: 0;
+            font-family: serif;
+            font-size: clamp(38px, 7vw, 66px);
+            letter-spacing: 0.34em;
+            color: #9a741d;
+            text-indent: 0.34em;
+        }
+        .desc {
+            margin: 18px auto 0;
+            max-width: 560px;
+            color: var(--muted);
+            line-height: 1.8;
+            font-size: 15px;
+        }
+        .bar {
+            width: 100%;
+            height: 14px;
+            margin: 34px 0 16px;
+            border-radius: 999px;
+            background: #e7edf6;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(31, 41, 55, 0.08);
+        }
+        .fill {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #8fdca0, #35bf63, #d4af37);
+            transition: width 180ms ease;
+        }
+        .status {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .actions {
+            margin-top: 30px;
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        button, a.button {
+            appearance: none;
+            border: 1px solid var(--gold);
+            border-radius: 999px;
+            padding: 12px 28px;
+            background: #4a2f00;
+            color: #f5cf5d;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 15px;
+            letter-spacing: 0.08em;
+            box-shadow: 0 12px 30px rgba(139, 107, 24, 0.18);
+        }
+        button:disabled {
+            cursor: wait;
+            opacity: 0.58;
+        }
+        .ghost {
+            background: #ffffff;
+            color: #8b6b18;
+        }
+        .warn {
+            margin-top: 18px;
+            min-height: 22px;
+            color: #b45309;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+    </style>
 </head>
 <body>
-<a href="ceshi2.html">进入赤峰雅乐</a>
+<main class="shell">
+    <div class="kicker">CHIFENG YAYUE</div>
+    <h1>赤峰雅乐</h1>
+    <p class="desc">
+        首次打开会先下载游戏音频、动画和资料图片。等待完成后再进入游戏，游玩时会优先从本地缓存读取资源。
+    </p>
+    <div class="bar" aria-label="加载进度">
+        <div id="fill" class="fill"></div>
+    </div>
+    <div class="status">
+        <span id="phase">正在准备缓存...</span>
+        <span id="count">0 / 0</span>
+        <span id="percent">0%</span>
+    </div>
+    <div class="actions">
+        <button id="startBtn" disabled>资源准备中</button>
+        <a id="skipBtn" class="button ghost" href="ceshi2.html">直接进入</a>
+    </div>
+    <div id="warn" class="warn"></div>
+</main>
+<script src="preload-manifest.js"></script>
+<script>
+    const CACHE_NAME = 'chifeng-yayue-assets-v1';
+    const GAME_URL = 'ceshi2.html';
+    const CONCURRENCY = 6;
+    const assets = Array.from(new Set(window.PRELOAD_ASSETS || []));
+    const fillEl = document.getElementById('fill');
+    const phaseEl = document.getElementById('phase');
+    const countEl = document.getElementById('count');
+    const percentEl = document.getElementById('percent');
+    const startBtn = document.getElementById('startBtn');
+    const warnEl = document.getElementById('warn');
+
+    let done = 0;
+    let failed = 0;
+
+    function updateProgress(label) {
+        const total = Math.max(assets.length, 1);
+        const pct = Math.round((done / total) * 100);
+        fillEl.style.width = `${pct}%`;
+        phaseEl.textContent = label;
+        countEl.textContent = `${done} / ${assets.length}`;
+        percentEl.textContent = `${pct}%`;
+    }
+
+    async function registerWorker() {
+        if (!('serviceWorker' in navigator)) {
+            warnEl.textContent = '当前浏览器不支持离线缓存，将使用普通浏览器缓存。';
+            return;
+        }
+        const registration = await navigator.serviceWorker.register('service-worker.js');
+        if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        await navigator.serviceWorker.ready;
+    }
+
+    async function cacheAsset(cache, asset) {
+        const url = new URL(asset, location.href).toString();
+        const cached = await cache.match(url, { ignoreSearch: true });
+        if (cached) return 'cached';
+        let lastError;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const response = await fetch(url, { cache: 'reload' });
+                if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+                await cache.put(url, response.clone());
+                return 'downloaded';
+            } catch (err) {
+                lastError = err;
+            }
+        }
+        throw lastError;
+    }
+
+    async function runQueue(items, worker) {
+        let index = 0;
+        const workers = Array.from({ length: CONCURRENCY }, async () => {
+            while (index < items.length) {
+                const current = items[index++];
+                await worker(current);
+            }
+        });
+        await Promise.all(workers);
+    }
+
+    async function preload() {
+        startBtn.disabled = true;
+        startBtn.textContent = '资源准备中';
+        updateProgress('正在注册缓存...');
+        try {
+            await registerWorker();
+            const cache = await caches.open(CACHE_NAME);
+            updateProgress('正在下载资源...');
+            await runQueue(assets, async (asset) => {
+                try {
+                    await cacheAsset(cache, asset);
+                } catch (err) {
+                    failed += 1;
+                    console.warn(`Failed to cache ${asset}`, err);
+                } finally {
+                    done += 1;
+                    updateProgress(failed ? `有 ${failed} 个资源失败，可重试` : '正在下载资源...');
+                }
+            });
+            if (failed) {
+                startBtn.disabled = false;
+                startBtn.textContent = '重试缓存';
+                warnEl.textContent = `有 ${failed} 个资源没有缓存成功。可以重试，或者直接进入游戏。`;
+                startBtn.onclick = () => location.reload();
+                return;
+            }
+            updateProgress('资源准备完成');
+            startBtn.disabled = false;
+            startBtn.textContent = '进入游戏';
+            startBtn.onclick = () => {
+                location.href = GAME_URL;
+            };
+            setTimeout(() => {
+                if (!document.hidden) startBtn.focus();
+            }, 80);
+        } catch (err) {
+            console.error(err);
+            startBtn.disabled = false;
+            startBtn.textContent = '重试缓存';
+            startBtn.onclick = () => location.reload();
+            warnEl.textContent = '缓存初始化失败。可以重试，或者直接进入游戏。';
+        }
+    }
+
+    updateProgress('正在准备缓存...');
+    preload();
+</script>
 </body>
 </html>

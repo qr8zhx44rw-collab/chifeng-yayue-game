@@ -1,0 +1,3498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>赤峰雅乐 - 混音模拟器 (Canvas版)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            overflow: hidden;
+            touch-action: none;
+            font-family: "Microsoft YaHei", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+            background: radial-gradient(circle at center, #ffffff 0%, #f3f6fb 70%, #e9eef6 100%);
+            max-width: 100%;
+            max-height: 100%;
+        }
+        #loading {
+            position: absolute;
+            color: #d4af37;
+            font-size: 24px;
+            pointer-events: none;
+        }
+
+        /* 曲谱按钮 */
+        #scoreBtn {
+            position: fixed;
+            top: 20px;
+            right: 24px;
+            z-index: 100;
+            background: linear-gradient(135deg, #2a1a00, #4a2e00);
+            border: 1px solid #d4af37;
+            color: #d4af37;
+            font-size: 15px;
+            font-family: "Microsoft YaHei", sans-serif;
+            padding: 8px 18px;
+            border-radius: 20px;
+            cursor: pointer;
+            letter-spacing: 2px;
+            box-shadow: 0 0 12px rgba(212,175,55,0.3);
+            transition: all 0.2s;
+        }
+        #scoreBtn:hover {
+            background: linear-gradient(135deg, #4a2e00, #6b4400);
+            box-shadow: 0 0 20px rgba(212,175,55,0.6);
+        }
+
+        /* 曲谱覆盖层 */
+        #scoreOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            background: rgba(255,255,255,0.96);
+            backdrop-filter: blur(6px);
+            flex-direction: column;
+            align-items: center;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        #scoreOverlay.open {
+            display: flex;
+        }
+
+        /* 覆盖层头部 */
+        .overlay-header {
+            width: 100%;
+            max-width: 860px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 24px 0;
+            box-sizing: border-box;
+        }
+        .overlay-title {
+            color: #8b6b18;
+            font-size: 22px;
+            letter-spacing: 4px;
+            font-family: serif;
+        }
+        .overlay-close {
+            background: none;
+            border: 1px solid #d2d8e2;
+            color: #667085;
+            font-size: 20px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .overlay-close:hover {
+            border-color: #d4af37;
+            color: #d4af37;
+        }
+
+        /* 搜索框 */
+        .search-wrap {
+            width: 100%;
+            max-width: 860px;
+            padding: 16px 24px;
+            box-sizing: border-box;
+            display: flex;
+            gap: 10px;
+        }
+        .search-wrap input {
+            flex: 1;
+            background: #ffffff;
+            border: 1px solid #d9dfe9;
+            color: #1f2937;
+            font-size: 15px;
+            padding: 10px 18px;
+            border-radius: 24px;
+            outline: none;
+            font-family: "Microsoft YaHei", sans-serif;
+            transition: border-color 0.2s;
+        }
+        .search-wrap input:focus {
+            border-color: #d4af37;
+        }
+
+        /* 筛选标签 */
+        .filter-wrap {
+            width: 100%;
+            max-width: 860px;
+            padding: 0 24px 14px;
+            box-sizing: border-box;
+            display: flex;
+            gap: 8px;
+        }
+        .filter-btn {
+            background: #f6f8fc;
+            border: 1px solid #d7deea;
+            color: #667085;
+            font-size: 13px;
+            padding: 5px 14px;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .filter-btn.active {
+            background: #fff7e8;
+            border-color: #d4af37;
+            color: #8b6b18;
+        }
+
+        /* 结果区域 */
+        .results-wrap {
+            width: 100%;
+            max-width: 860px;
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 24px 24px;
+            box-sizing: border-box;
+        }
+        .results-wrap::-webkit-scrollbar { width: 4px; }
+        .results-wrap::-webkit-scrollbar-track { background: #eef2f8; }
+        .results-wrap::-webkit-scrollbar-thumb { background: #c5cfde; border-radius: 2px; }
+
+        .result-count {
+            color: #7b8494;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .music-card {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #e1e6ef;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .music-card:hover {
+            border-color: #d4af37;
+            background: #fffdf7;
+            box-shadow: 0 8px 20px rgba(25, 32, 48, 0.06);
+        }
+        .music-card-cover {
+            width: 56px;
+            height: 56px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: #eef2f8;
+            flex-shrink: 0;
+        }
+        .music-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .music-card-title {
+            color: #1f2937;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        .music-card-meta {
+            color: #667085;
+            font-size: 13px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .tag {
+            background: #fff7e8;
+            color: #8b6b18;
+            border: 1px solid #eed69a;
+            border-radius: 4px;
+            padding: 1px 7px;
+            font-size: 12px;
+        }
+        .music-card-arrow {
+            color: #8a94a7;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        /* 曲谱查看弹窗 */
+        #scoreViewer {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 300;
+            background: rgba(255,255,255,0.98);
+            flex-direction: column;
+            align-items: center;
+        }
+        #scoreViewer.open {
+            display: flex;
+        }
+        .viewer-header {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            box-sizing: border-box;
+            border-bottom: 1px solid #e3e9f2;
+        }
+        .viewer-title {
+            color: #8b6b18;
+            font-size: 18px;
+            font-family: serif;
+            letter-spacing: 2px;
+        }
+        .viewer-close {
+            background: none;
+            border: 1px solid #d2d8e2;
+            color: #667085;
+            font-size: 20px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .viewer-close:hover { border-color: #d4af37; color: #d4af37; }
+        .viewer-body {
+            flex: 1;
+            overflow-y: auto;
+            width: 100%;
+            max-width: 700px;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        .viewer-desc {
+            color: #667085;
+            font-size: 14px;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            border-left: 2px solid #d4af37;
+            padding-left: 12px;
+            background: #fffdf7;
+        }
+        .viewer-score-img {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid #dfe6f0;
+        }
+        .viewer-no-score {
+            text-align: center;
+            color: #8a94a7;
+            padding: 60px 0;
+            font-size: 15px;
+        }
+
+        /* 数字资料馆 */
+        #scoreOverlay {
+            background:
+                radial-gradient(circle at 22% 12%, rgba(212,175,55,0.14), transparent 28%),
+                linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,249,253,0.98));
+        }
+        #scoreOverlay .overlay-header {
+            max-width: 1100px;
+            padding-top: 22px;
+        }
+        .archive-panel {
+            width: min(1100px, calc(100vw - 42px));
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            margin: 14px 0 34px;
+            border: 1px solid rgba(212,175,55,0.24);
+            border-radius: 28px;
+            background: rgba(255,255,255,0.78);
+            box-shadow: 0 28px 80px rgba(31,41,55,0.12);
+            overflow: hidden;
+        }
+        .archive-hero {
+            min-height: 150px;
+            padding: 28px 34px;
+            color: #fff;
+            background:
+                linear-gradient(90deg, rgba(38,29,14,0.82), rgba(95,68,21,0.48), rgba(255,255,255,0.12)),
+                url("assets/archive/banner1.jpg") center/cover;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 28px;
+            align-items: end;
+        }
+        .archive-kicker {
+            color: #f1d77b;
+            font-size: 13px;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+        }
+        .archive-hero-title {
+            font-family: "Songti SC", "STSong", serif;
+            font-size: 34px;
+            letter-spacing: 4px;
+            line-height: 1.15;
+        }
+        .archive-hero-desc {
+            max-width: 620px;
+            margin-top: 12px;
+            color: rgba(255,255,255,0.86);
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .archive-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 86px);
+            gap: 10px;
+        }
+        .archive-stat {
+            padding: 12px 10px;
+            border: 1px solid rgba(255,255,255,0.28);
+            border-radius: 16px;
+            background: rgba(255,255,255,0.16);
+            backdrop-filter: blur(6px);
+            text-align: center;
+        }
+        .archive-stat strong {
+            display: block;
+            font-size: 22px;
+            color: #ffe8a3;
+            line-height: 1.1;
+        }
+        .archive-stat span {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.82);
+        }
+        .archive-tabs {
+            display: flex;
+            gap: 10px;
+            padding: 16px 22px;
+            border-bottom: 1px solid #e7edf5;
+            background: rgba(255,255,255,0.88);
+        }
+        .archive-tab {
+            border: 1px solid #d7deea;
+            background: #ffffff;
+            color: #667085;
+            font-size: 14px;
+            font-family: "Microsoft YaHei", sans-serif;
+            padding: 8px 18px;
+            border-radius: 22px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .archive-tab.active {
+            color: #8b6b18;
+            border-color: #d4af37;
+            background: #fff7e8;
+            box-shadow: 0 10px 24px rgba(212,175,55,0.14);
+        }
+        .archive-page {
+            display: none;
+            padding: 20px 24px 26px;
+        }
+        .archive-page.active {
+            display: block;
+        }
+        .archive-page .search-wrap,
+        .archive-page .filter-wrap,
+        .archive-page .results-wrap {
+            max-width: none;
+            width: 100%;
+            padding-left: 0;
+            padding-right: 0;
+        }
+        .archive-page .results-wrap {
+            overflow: visible;
+            padding-bottom: 0;
+        }
+        .archive-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+        .archive-card {
+            background: #fff;
+            border: 1px solid #e1e6ef;
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 12px 34px rgba(31,41,55,0.06);
+        }
+        .archive-card h3 {
+            margin: 0 0 10px;
+            color: #1f2937;
+            font-size: 18px;
+            font-family: "Songti SC", "STSong", serif;
+            letter-spacing: 2px;
+        }
+        .archive-card p {
+            margin: 0;
+            color: #667085;
+            font-size: 14px;
+            line-height: 1.85;
+        }
+        .archive-wide {
+            grid-column: 1 / -1;
+        }
+        .timeline {
+            display: grid;
+            gap: 10px;
+        }
+        .timeline-item {
+            display: grid;
+            grid-template-columns: 88px 1fr;
+            gap: 14px;
+            align-items: start;
+            padding: 12px 0;
+            border-bottom: 1px dashed #d9e1ec;
+        }
+        .timeline-year {
+            color: #8b6b18;
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .timeline-text {
+            color: #475467;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+        .heritage-feature {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .archive-section-title {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            margin: 24px 0 12px;
+        }
+        .archive-section-title h3 {
+            margin: 0;
+            color: #1f2937;
+            font-family: "Songti SC", "STSong", serif;
+            font-size: 23px;
+            letter-spacing: 3px;
+        }
+        .archive-section-title span {
+            color: #8b6b18;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+        .heritage-person-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin: 16px 0;
+        }
+        .heritage-person-card {
+            position: relative;
+            overflow: hidden;
+            min-height: 190px;
+            padding: 22px;
+            border-radius: 20px;
+            border: 1px solid #e1e6ef;
+            background:
+                radial-gradient(circle at 88% 18%, rgba(212,175,55,0.18), transparent 34%),
+                linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 18px 44px rgba(31,41,55,0.07);
+        }
+        .heritage-person-card::after {
+            content: attr(data-mark);
+            position: absolute;
+            right: 18px;
+            bottom: -14px;
+            color: rgba(139,107,24,0.08);
+            font-size: 88px;
+            font-family: "Songti SC", "STSong", serif;
+            line-height: 1;
+        }
+        .heritage-person-card h3,
+        .heritage-article-card h3 {
+            margin: 0 0 10px;
+            color: #1f2937;
+            font-family: "Songti SC", "STSong", serif;
+            font-size: 22px;
+            letter-spacing: 2px;
+        }
+        .heritage-person-card p {
+            position: relative;
+            z-index: 1;
+            margin: 0;
+            color: #5b6678;
+            font-size: 14px;
+            line-height: 1.85;
+        }
+        .heritage-tags {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .heritage-tags span {
+            color: #8b6b18;
+            background: #fff7e8;
+            border: 1px solid #eed69a;
+            border-radius: 999px;
+            padding: 3px 10px;
+            font-size: 12px;
+        }
+        .heritage-article-list {
+            display: grid;
+            gap: 16px;
+        }
+        .heritage-article-card {
+            border: 1px solid #e1e6ef;
+            border-radius: 22px;
+            background: #ffffff;
+            box-shadow: 0 18px 44px rgba(31,41,55,0.07);
+            overflow: hidden;
+        }
+        .heritage-article-head {
+            padding: 22px 24px 18px;
+            background:
+                linear-gradient(90deg, rgba(255,247,232,0.88), rgba(255,255,255,0.92)),
+                radial-gradient(circle at right top, rgba(212,175,55,0.18), transparent 35%);
+            border-bottom: 1px solid #edf1f7;
+        }
+        .heritage-article-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            color: #8a94a7;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        .heritage-article-summary {
+            margin: 0;
+            color: #667085;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .heritage-article-card details {
+            padding: 0 24px 22px;
+        }
+        .heritage-article-card summary {
+            width: fit-content;
+            margin-top: 16px;
+            color: #8b6b18;
+            background: #fff7e8;
+            border: 1px solid #eed69a;
+            border-radius: 999px;
+            padding: 7px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .heritage-article-body {
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px dashed #d9e1ec;
+            color: #39445a;
+            font-size: 15px;
+            line-height: 2;
+        }
+        .heritage-article-body p {
+            margin: 0 0 15px;
+        }
+        .heritage-article-body .article-heading {
+            margin-top: 22px;
+            color: #8b6b18;
+            font-weight: 700;
+            font-size: 17px;
+        }
+        .instrument-archive-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .instrument-archive-card {
+            position: relative;
+            min-height: 150px;
+            padding: 18px;
+            border-radius: 18px;
+            border: 1px solid #e1e6ef;
+            background:
+                radial-gradient(circle at right top, rgba(212,175,55,0.13), transparent 42%),
+                #ffffff;
+            box-shadow: 0 12px 30px rgba(31,41,55,0.05);
+        }
+        .instrument-archive-card .family {
+            display: inline-flex;
+            color: #8b6b18;
+            background: #fff7e8;
+            border: 1px solid #eed69a;
+            border-radius: 999px;
+            padding: 2px 9px;
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+        .instrument-archive-card h3 {
+            margin: 0 0 8px;
+            color: #1f2937;
+            font-size: 18px;
+        }
+        .instrument-archive-card p {
+            margin: 0;
+            color: #667085;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+        @media (max-width: 760px) {
+            .archive-hero {
+                grid-template-columns: 1fr;
+                padding: 24px;
+            }
+            .archive-stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .archive-grid,
+            .instrument-archive-grid,
+            .heritage-feature,
+            .heritage-person-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* 音频解锁提示 */
+        #audioUnlockBanner {
+            position: fixed;
+            bottom: 160px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 500;
+            background: rgba(212,175,55,0.15);
+            border: 1px solid #d4af37;
+            color: #d4af37;
+            font-size: 14px;
+            font-family: "Microsoft YaHei", sans-serif;
+            padding: 10px 28px;
+            border-radius: 24px;
+            letter-spacing: 2px;
+            backdrop-filter: blur(6px);
+            cursor: pointer;
+            transition: opacity 0.5s;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%,100% { box-shadow: 0 0 8px rgba(212,175,55,0.3); }
+            50% { box-shadow: 0 0 20px rgba(212,175,55,0.7); }
+        }
+        #audioUnlockBanner.hidden { opacity: 0; pointer-events: none; }
+
+        #page-splash {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background:
+                radial-gradient(circle at 50% 32%, rgba(212,175,55,0.13), rgba(212,175,55,0) 34%),
+                linear-gradient(180deg, #ffffff 0%, #f7f9fc 58%, #eef2f7 100%);
+            color: #182230;
+            transition: opacity 0.55s ease, visibility 0.55s ease;
+        }
+        #page-splash.splash-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .splash-center {
+            width: min(900px, calc(100vw - 48px));
+            text-align: center;
+            transform: translateY(-8px);
+        }
+        .splash-title {
+            font-family: "Songti SC", "STSong", serif;
+            font-size: 76px;
+            line-height: 1;
+            letter-spacing: 0;
+            color: #1f2937;
+            text-shadow: 0 14px 36px rgba(31,41,55,0.13);
+            animation: splashRise 1s cubic-bezier(.2,.8,.2,1) 0.15s both;
+        }
+        .splash-baseline {
+            margin-top: 20px;
+            font-size: 20px;
+            letter-spacing: 0;
+            color: #9b7416;
+            animation: splashRise 1s cubic-bezier(.2,.8,.2,1) 0.7s both;
+        }
+        .splash-experience {
+            margin-top: 40px;
+            font-size: 16px;
+            letter-spacing: 0;
+            color: #667085;
+            animation: splashRise 1s cubic-bezier(.2,.8,.2,1) 1.25s both;
+        }
+        .splash-headphone {
+            position: relative;
+            width: 150px;
+            height: 132px;
+            margin: 22px auto 0;
+            animation: splashRise 1s cubic-bezier(.2,.8,.2,1) 1.7s both;
+        }
+        .splash-headphone::before {
+            content: "";
+            position: absolute;
+            left: 28px;
+            top: 4px;
+            width: 78px;
+            height: 84px;
+            border: 8px solid #d7b85f;
+            border-bottom: 0;
+            border-radius: 88px 88px 0 0;
+        }
+        .splash-headphone::after {
+            content: "";
+            position: absolute;
+            left: 20px;
+            top: 76px;
+            width: 28px;
+            height: 50px;
+            border-radius: 18px;
+            background: #d7b85f;
+            box-shadow: 82px 0 0 #d7b85f;
+        }
+        .splash-start {
+            margin-top: 34px;
+            border: 1px solid rgba(215,184,95,0.8);
+            background: #d7b85f;
+            color: #111827;
+            font-size: 16px;
+            font-family: "Microsoft YaHei", sans-serif;
+            letter-spacing: 0;
+            padding: 12px 30px;
+            border-radius: 28px;
+            cursor: pointer;
+            box-shadow: 0 18px 48px rgba(215,184,95,0.28);
+            animation: splashRise 1s cubic-bezier(.2,.8,.2,1) 2.15s both;
+        }
+        .splash-start:hover {
+            background: #f1d77b;
+        }
+        @keyframes splashRise {
+            from { opacity: 0; transform: translateY(34px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="page-splash" class="enabled">
+    <div class="splash-center">
+        <div class="splash-title">赤峰雅乐</div>
+        <div class="splash-baseline">跟随节奏，编织雅乐</div>
+        <div class="splash-experience">为了获得更好的体验，请佩戴耳机</div>
+        <div class="splash-headphone" aria-hidden="true"></div>
+        <button id="splashStart" class="splash-start" type="button">进入游戏</button>
+    </div>
+</div>
+
+<div id="loading">资源加载中...</div>
+<canvas id="gameCanvas"></canvas>
+
+<!-- 音频解锁由首次用户交互自动触发 -->
+
+<!-- 资料入口按钮 -->
+<button id="scoreBtn" onclick="openScoreOverlay()">📜 资料馆</button>
+
+<!-- 曲谱列表覆盖层 -->
+<div id="scoreOverlay">
+    <div class="overlay-header">
+        <span class="overlay-title">赤 峰 雅 乐 · 数 字 资 料 馆</span>
+        <button class="overlay-close" onclick="closeScoreOverlay()">✕</button>
+    </div>
+    <div class="archive-panel">
+        <div class="archive-hero">
+            <div>
+                <div class="archive-kicker">DIGITAL YAYUE ARCHIVE</div>
+                <div class="archive-hero-title">在演奏之外，保存赤峰雅乐的来处</div>
+                <div class="archive-hero-desc">曲谱、历史文字、传承人物和乐器资料在这里汇成一座数字展厅。主舞台继续保持混音体验，资料馆用于理解赤峰雅乐的来处与传承。</div>
+            </div>
+            <div class="archive-stats" aria-label="资料概览">
+                <div class="archive-stat"><strong>23</strong><span>首曲目</span></div>
+                <div class="archive-stat"><strong>4</strong><span>套乐章</span></div>
+                <div class="archive-stat"><strong>130+</strong><span>年流传</span></div>
+            </div>
+        </div>
+        <div class="archive-tabs">
+            <button class="archive-tab active" data-archive-tab="scores" onclick="setArchiveTab('scores')">曲谱库</button>
+            <button class="archive-tab" data-archive-tab="story" onclick="setArchiveTab('story')">雅乐故事</button>
+            <button class="archive-tab" data-archive-tab="instruments" onclick="setArchiveTab('instruments')">乐器志</button>
+        </div>
+        <div id="archiveScores" class="archive-page active">
+            <div class="search-wrap">
+                <input type="text" id="scoreSearch" placeholder="搜索曲目名称、分类、乐器..." oninput="renderScoreList()">
+            </div>
+            <div class="filter-wrap">
+                <button class="filter-btn active" data-cat="全部" onclick="setFilter(this)">全部</button>
+                <button class="filter-btn" data-cat="大典" onclick="setFilter(this)">大典</button>
+                <button class="filter-btn" data-cat="四季" onclick="setFilter(this)">四季</button>
+                <button class="filter-btn" data-cat="雁旋" onclick="setFilter(this)">雁旋</button>
+                <button class="filter-btn" data-cat="龙腾" onclick="setFilter(this)">龙腾</button>
+            </div>
+            <div class="results-wrap">
+                <div class="result-count" id="scoreCount"></div>
+                <div id="scoreList"></div>
+            </div>
+        </div>
+        <div id="archiveStory" class="archive-page"></div>
+        <div id="archiveInstruments" class="archive-page"></div>
+    </div>
+</div>
+
+<!-- 曲谱查看器 -->
+<div id="scoreViewer">
+    <div class="viewer-header">
+        <span class="viewer-title" id="viewerTitle"></span>
+        <button class="viewer-close" onclick="closeScoreViewer()">✕</button>
+    </div>
+    <div class="viewer-body">
+        <div class="viewer-desc" id="viewerDesc"></div>
+        <div id="viewerScoreContent"></div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const loadingDiv = document.getElementById('loading');
+    const splashEl = document.getElementById('page-splash');
+    const splashStartBtn = document.getElementById('splashStart');
+
+    // 游戏配置
+    const CONFIG = {
+        width: 1280,
+        height: 720,
+        colors: {
+            bg: '#1a1a1a',
+            slotEmpty: '#222',
+            gold: '#d4af37',
+            goldBright: '#ffeeb0',
+            goldDim: '#554422',
+            text: '#fff',
+            glow: 'rgba(212, 175, 55, 0.6)'
+        }
+    };
+
+    const TRACK_COUNT = 6;
+    let INSTRUMENTS = [
+        { id: 'snare', name: '大军鼓', color: '#c85d4f', family: 'percussion' },
+        { id: 'kick', name: '底鼓', color: '#d4834b', family: 'percussion' },
+        { id: 'cymbal', name: '镲片', color: '#c6a84c', family: 'percussion' },
+        { id: 'bass', name: '贝斯', color: '#4f8f8a', family: 'bass' },
+        { id: 'keyboard', name: '电子琴', color: '#596fa8', family: 'keys' },
+        { id: 'flute', name: '笛子', color: '#5f9f6d', family: 'wind' }
+    ];
+    let INSTRUMENT_MAP = Object.fromEntries(INSTRUMENTS.map(inst => [inst.id, inst]));
+    let DOCK_ROWS = [
+        { left: ['snare', 'kick', 'cymbal', 'bass', 'keyboard', 'flute'], right: [] }
+    ];
+
+    let slots = [];
+    let dockItems = [];
+    let particles = [];
+    let instrumentImages = {};
+    let spriteFrames = {};
+    let spriteBoundsCache = new WeakMap();
+    let spriteSourceBounds = {};
+
+    // --- 音乐播放系统 ---
+    let AUDIO_SRC = {
+        'snare': 'song1/军鼓.mp3',
+        'kick': 'song1/底鼓.mp3',
+        'cymbal': 'song1/镲片.mp3',
+        'bass': 'song1/电贝斯.mp3',
+        'keyboard': 'song1/电钢琴.mp3',
+        'flute': 'song1/笛子.mp3'
+    };
+    let ICON_SRC = {
+        'snare': 'song1乐器图片/大军鼓.png',
+        'kick': 'song1乐器图片/低鼓.png',
+        'cymbal': 'song1乐器图片/擦片.png',
+        'bass': 'song1乐器图片/贝斯.png',
+        'keyboard': 'song1乐器图片/电子琴.png',
+        'flute': 'song1乐器图片/笛子.png'
+    };
+    const KEYBOARD_FRAME_STAMPS = [
+        '00-00-100', '00-00-142', '00-00-184', '00-00-226', '00-00-267', '00-00-309',
+        '00-00-351', '00-00-393', '00-00-435', '00-00-477', '00-00-519', '00-00-560',
+        '00-00-602', '00-00-644', '00-00-686', '00-00-728', '00-00-770', '00-00-812',
+        '00-00-853', '00-00-895', '00-00-937', '00-00-979', '00-01-021', '00-01-063',
+        '00-01-105', '00-01-147', '00-01-188', '00-01-230', '00-01-272', '00-01-314',
+        '00-01-356', '00-01-398', '00-01-440', '00-01-481', '00-01-523', '00-01-565',
+        '00-01-607', '00-01-649', '00-01-691', '00-01-733', '00-01-774', '00-01-816',
+        '00-01-858', '00-01-900'
+    ];
+    const KEYBOARD_FRAME_FILES = KEYBOARD_FRAME_STAMPS.map((stamp, index) => {
+        const frame = String(index + 1).padStart(3, '0');
+        return `song1动画/电子琴/jimeng-2026-05-08-9207-保持镜头视角不变-角色弹奏电子琴-角色-微动作-frame-${frame}-${stamp}.png`;
+    });
+    const SNARE_FRAME_FILES = [
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-001-00-00-109.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-002-00-00-151.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-003-00-00-193.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-004-00-00-235.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-005-00-00-276.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-006-00-00-318.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-007-00-00-360.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-008-00-00-402.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-009-00-00-444.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-010-00-00-485.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-011-00-00-527.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-012-00-00-569.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-013-00-00-611.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-014-00-00-653.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-015-00-00-694.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-016-00-00-736.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-017-00-00-778.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-018-00-00-820.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-019-00-00-862.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-020-00-00-903.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-021-00-00-945.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-022-00-00-987.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-023-00-01-029.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-024-00-01-071.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-025-00-01-112.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-026-00-01-154.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-027-00-01-196.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-028-00-01-238.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-029-00-01-280.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-030-00-01-321.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-031-00-01-363.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-032-00-01-405.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-033-00-01-447.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-034-00-01-489.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-035-00-01-530.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-036-00-01-572.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-037-00-01-614.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-038-00-01-656.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-039-00-01-698.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-040-00-01-739.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-041-00-01-781.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-042-00-01-823.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-043-00-01-865.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-044-00-01-907.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-045-00-01-948.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-046-00-01-990.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-047-00-02-032.png',
+        'song1动画/大军鼓/jimeng-2026-05-08-3184-保持镜头视角不变-角色缓慢敲击大军鼓-微动作-frame-048-00-02-074.png'
+    ];
+    const BASS_FRAME_FILES = SNARE_FRAME_FILES.map(src => {
+        const match = src.match(/frame-(\d{3}-\d{2}-\d{2}-\d{3})\.png$/);
+        return `song1动画/贝斯/jimeng-2026-05-08-3303-保持视角不变-角色演奏贝斯-微动作-frame-${match[1]}.png`;
+    });
+    const KICK_FRAME_FILES = SNARE_FRAME_FILES.map(src => {
+        const match = src.match(/frame-(\d{3}-\d{2}-\d{2}-\d{3})\.png$/);
+        return `song1动画/低鼓/jimeng-2026-05-08-9102-保持镜头视角不变-角色缓慢踩底鼓的脚踏盘-并且脚踏板的击锤也会随着底鼓踩下而敲打-frame-${match[1]}.png`;
+    });
+    const CYMBAL_FRAME_FILES = SNARE_FRAME_FILES.map(src => {
+        const match = src.match(/frame-(\d{3}-\d{2}-\d{2}-\d{3})\.png$/);
+        return `song1动画/镲片/jimeng-2026-05-08-2110-固定镜头视角-重点突出角色敲打镲片-角色表情不变-微动作-frame-${match[1]}.png`;
+    });
+    const FLUTE_FRAME_FILES = SNARE_FRAME_FILES.map(src => {
+        const match = src.match(/frame-(\d{3}-\d{2}-\d{2}-\d{3})\.png$/);
+        return `song1动画/笛子/jimeng-2026-05-10-9917-固定镜头视角-角色演奏笛子-微动作-frame-${match[1]}.png`;
+    });
+    const FRAME_STAMPS_48 = SNARE_FRAME_FILES.map(src => src.match(/frame-(\d{3}-\d{2}-\d{2}-\d{3})\.png$/)[1]);
+    const SONG2_CHINA_DRUM_FRAME_FILES = FRAME_STAMPS_48.map(stamp => {
+        return `song2动画/中国大鼓/jimeng-2026-05-10-5448-固定镜头视角-角色敲击大鼓-微动作-frame-${stamp}.png`;
+    });
+    const SONG2_DOUBLE_BASS_FRAME_FILES = FRAME_STAMPS_48.map(stamp => {
+        return `song2动画/低音提琴/jimeng-2026-05-10-6853-固定角色视角-角色演奏低音提琴-缓慢优雅-微动作-frame-${stamp}.png`;
+    });
+    const SONG2_GUZHENG_FRAME_FILES = FRAME_STAMPS_48.map(stamp => {
+        return `song2动画/古筝/jimeng-2026-05-10-2731-固定镜头视角-角色演奏古筝-微动作-frame-${stamp}.png`;
+    });
+    const SONG2_CHOIR_FRAME_FILES = FRAME_STAMPS_48.map(stamp => {
+        return `song2动画/合唱 2/jimeng-2026-05-10-6598-固定镜头视角-角色优雅的唱歌-动作缓慢-并且动作很微小-frame-${stamp}.png`;
+    });
+    const SONG2_BAMBOO_FLUTE_FRAME_FILES = FRAME_STAMPS_48.map(stamp => {
+        return `song2动画/竹笛/jimeng-2026-05-10-4695-固定镜头视角-角色演奏笛子-微动作-frame-${stamp}.png`;
+    });
+    const SONG2_SYNTH_FRAME_FILES = FRAME_STAMPS_48.map(stamp => {
+        return `song2动画/合成器/jimeng-2026-05-10-4995-固定镜头视角-角色固定表情-角色使用合成器-微动作-frame-${stamp}.png`;
+    });
+
+    let SPRITE_FRAME_FILES = {
+        keyboard: KEYBOARD_FRAME_FILES,
+        snare: SNARE_FRAME_FILES,
+        bass: BASS_FRAME_FILES,
+        kick: KICK_FRAME_FILES,
+        cymbal: CYMBAL_FRAME_FILES,
+        flute: FLUTE_FRAME_FILES
+    };
+    let SPRITE_DRAW_CONFIG = {
+        default: { offsetX: 0, top: 50, height: 246 },
+        snare: { offsetX: 0, top: 50, height: 246 },
+        kick: { offsetX: 0, top: 58, height: 236 },
+        cymbal: { offsetX: 0, top: 58, height: 236 },
+        bass: { offsetX: 18, top: 54, height: 240 },
+        keyboard: { offsetX: 0, top: 48, height: 250 },
+        flute: { offsetX: 4, top: 54, height: 240 }
+    };
+    const BONUS_CIRCLE = {
+        x: 88,
+        y: 96,
+        radius: 29,
+        outerRadius: 43,
+        color: '#35bf63',
+        dashColor: '#8ce082'
+    };
+    let AUDIO_DURATION = {
+        'snare': 10.488,
+        'kick': 10.488,
+        'cymbal': 10.488,
+        'bass': 10.488,
+        'keyboard': 10.488,
+        'flute': 10.488
+    };
+    let BONUS_TRACK_SRC = 'song1/完整曲目1.mp3';
+    let BONUS_TRACK_DURATION = 40.488;
+    let MASTER_LOOP_DURATION = Math.max(...Object.values(AUDIO_DURATION));
+    const ENTRY_SEGMENT_DURATION = 5;
+    const BONUS_PRE_ROLL_SECONDS = 2;
+    const LOOP_PROGRESS_BUTTON = { x: CONFIG.width - 118, y: 96, radius: 44 };
+    const SONG_SWITCH = { x: 180, y: 70, w: 232, h: 34, gap: 10 };
+    let activeSongId = 'song1';
+    let activeSong = null;
+    const SONG_CONFIGS = {
+        song1: {
+            id: 'song1',
+            switchLabel: '部分一',
+            title: '赤峰雅乐 · 部分一',
+            instruments: [
+                { id: 'snare', name: '大军鼓', color: '#c85d4f', family: 'percussion' },
+                { id: 'kick', name: '底鼓', color: '#d4834b', family: 'percussion' },
+                { id: 'cymbal', name: '镲片', color: '#c6a84c', family: 'percussion' },
+                { id: 'bass', name: '贝斯', color: '#4f8f8a', family: 'bass' },
+                { id: 'keyboard', name: '电子琴', color: '#596fa8', family: 'keys' },
+                { id: 'flute', name: '笛子', color: '#5f9f6d', family: 'wind' }
+            ],
+            dockRows: [{ left: ['snare', 'kick', 'cymbal', 'bass', 'keyboard', 'flute'], right: [] }],
+            audioSrc: {
+                snare: 'song1/军鼓.mp3',
+                kick: 'song1/底鼓.mp3',
+                cymbal: 'song1/镲片.mp3',
+                bass: 'song1/电贝斯.mp3',
+                keyboard: 'song1/电钢琴.mp3',
+                flute: 'song1/笛子.mp3'
+            },
+            iconSrc: {
+                snare: 'song1乐器图片/大军鼓.png',
+                kick: 'song1乐器图片/低鼓.png',
+                cymbal: 'song1乐器图片/擦片.png',
+                bass: 'song1乐器图片/贝斯.png',
+                keyboard: 'song1乐器图片/电子琴.png',
+                flute: 'song1乐器图片/笛子.png'
+            },
+            spriteFrameFiles: {
+                keyboard: KEYBOARD_FRAME_FILES,
+                snare: SNARE_FRAME_FILES,
+                bass: BASS_FRAME_FILES,
+                kick: KICK_FRAME_FILES,
+                cymbal: CYMBAL_FRAME_FILES,
+                flute: FLUTE_FRAME_FILES
+            },
+            spriteDrawConfig: {
+                default: { offsetX: 0, top: 50, height: 246 },
+                snare: { offsetX: 0, top: 50, height: 246 },
+                kick: { offsetX: 0, top: 58, height: 236 },
+                cymbal: { offsetX: 0, top: 58, height: 236 },
+                bass: { offsetX: 18, top: 54, height: 240 },
+                keyboard: { offsetX: 0, top: 48, height: 250 },
+                flute: { offsetX: 4, top: 54, height: 240 }
+            },
+            audioDuration: {
+                snare: 10.488,
+                kick: 10.488,
+                cymbal: 10.488,
+                bass: 10.488,
+                keyboard: 10.488,
+                flute: 10.488
+            },
+            bonusTrackSrc: 'song1/完整曲目1.mp3',
+            bonusTrackDuration: 40.488
+        },
+        song2: {
+            id: 'song2',
+            switchLabel: '部分二',
+            title: '赤峰雅乐 · 部分二',
+            instruments: [
+                { id: 'china_drum', name: '中国大鼓', color: '#bd604f', family: 'percussion' },
+                { id: 'double_bass_song2', name: '低音提琴', color: '#7d6a55', family: 'bass' },
+                { id: 'guzheng_song2', name: '古筝', color: '#bd9b42', family: 'strings' },
+                { id: 'choir_song2', name: '合唱', color: '#9b6fb2', family: 'voice' },
+                { id: 'synth_song2', name: '合成器', color: '#6675b8', family: 'keys' },
+                { id: 'bamboo_flute_song2', name: '竹笛', color: '#5f9f6d', family: 'wind' }
+            ],
+            dockRows: [{ left: ['china_drum', 'double_bass_song2', 'guzheng_song2', 'choir_song2', 'synth_song2', 'bamboo_flute_song2'], right: [] }],
+            audioSrc: {
+                china_drum: 'song2/中国大鼓.mp3',
+                double_bass_song2: 'song2/低音提琴.mp3',
+                guzheng_song2: 'song2/古筝.mp3',
+                choir_song2: 'song2/合唱.mp3',
+                synth_song2: 'song2/合成器.mp3',
+                bamboo_flute_song2: 'song2/竹笛.mp3'
+            },
+            iconSrc: {
+                china_drum: 'song2乐器图片/中国大鼓.png',
+                double_bass_song2: 'song2乐器图片/低音提琴.png',
+                guzheng_song2: 'song2乐器图片/古筝.png',
+                choir_song2: 'song2乐器图片/合唱.png',
+                synth_song2: 'song2乐器图片/合成器.png',
+                bamboo_flute_song2: 'song2乐器图片/竹笛.png'
+            },
+            spriteFrameFiles: {
+                china_drum: SONG2_CHINA_DRUM_FRAME_FILES,
+                double_bass_song2: SONG2_DOUBLE_BASS_FRAME_FILES,
+                guzheng_song2: SONG2_GUZHENG_FRAME_FILES,
+                choir_song2: SONG2_CHOIR_FRAME_FILES,
+                synth_song2: SONG2_SYNTH_FRAME_FILES,
+                bamboo_flute_song2: SONG2_BAMBOO_FLUTE_FRAME_FILES
+            },
+            spriteDrawConfig: {
+                default: { offsetX: 0, top: 50, height: 246 },
+                china_drum: { offsetX: 0, top: 56, height: 238 },
+                double_bass_song2: { offsetX: 0, top: 52, height: 246 },
+                guzheng_song2: { offsetX: 0, top: 54, height: 240 },
+                choir_song2: { offsetX: 0, top: 58, height: 236 },
+                synth_song2: { offsetX: 0, top: 56, height: 238 },
+                bamboo_flute_song2: { offsetX: 4, top: 54, height: 240 }
+            },
+            audioDuration: {
+                china_drum: 10.392,
+                double_bass_song2: 10.392,
+                guzheng_song2: 10.392,
+                choir_song2: 10.392,
+                synth_song2: 10.392,
+                bamboo_flute_song2: 10.392
+            },
+            bonusTrackSrc: 'song2/完整曲目2.mp3',
+            bonusTrackDuration: 42
+        }
+    };
+    let gTime    = 0;     // 全局时钟（秒）
+    let gRunning = false; // 时钟是否在运行
+    let gPaused  = false; // 全局暂停
+    let gRafId   = null;
+    let gLastTs  = null;
+    let lastLoopIndex = 0;
+    // 每个槽位对应的音频对象
+    let slotAudio = [];
+
+    let input = {
+        x: 0, y: 0, isDown: false,
+        dragItem: null, dragSource: null
+    };
+
+    let time = 0;
+    let bonusVisualProgress = 0;
+    let bonusLastCount = 0;
+    let bonusBump = 0;
+    let bonusPending = false;
+    let bonusWaitStartTime = 0;
+    let bonusWaitEndTime = 0;
+    let bonusSongAudio = null;
+    let bonusSongPlaying = false;
+    let bonusSongStartPerf = 0;
+    let bonusMuteSlotsAtTime = 0;
+    let bonusSlotsSilenced = false;
+    let loopStarted = false;
+
+    // --- 音乐时钟 ---
+    let audioCtx = null;
+
+    function unlockAudio() {
+        // 解锁浏览器音频自动播放限制
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        const banner = document.getElementById('audioUnlockBanner');
+        if (banner) banner.classList.add('hidden');
+        setTimeout(() => {
+            const b = document.getElementById('audioUnlockBanner');
+            if (b) b.style.display = 'none';
+        }, 600);
+    }
+
+    // 任意点击也触发解锁
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('mousedown', unlockAudio, { once: true });
+    if (splashStartBtn) {
+        splashStartBtn.addEventListener('click', () => {
+            unlockAudio();
+            if (splashEl) splashEl.classList.add('splash-hidden');
+        });
+    }
+
+    function applySongConfig(songId) {
+        const config = SONG_CONFIGS[songId] || SONG_CONFIGS.song1;
+        activeSongId = config.id;
+        activeSong = config;
+        INSTRUMENTS = config.instruments;
+        INSTRUMENT_MAP = Object.fromEntries(INSTRUMENTS.map(inst => [inst.id, inst]));
+        DOCK_ROWS = config.dockRows;
+        AUDIO_SRC = config.audioSrc;
+        ICON_SRC = config.iconSrc;
+        SPRITE_FRAME_FILES = config.spriteFrameFiles;
+        SPRITE_DRAW_CONFIG = config.spriteDrawConfig;
+        AUDIO_DURATION = config.audioDuration;
+        BONUS_TRACK_SRC = config.bonusTrackSrc;
+        BONUS_TRACK_DURATION = config.bonusTrackDuration || 0;
+        MASTER_LOOP_DURATION = Math.max(...Object.values(AUDIO_DURATION));
+    }
+
+    function selectSong(songId) {
+        if (songId === activeSongId) return false;
+        stopCurrentMix();
+        applySongConfig(songId);
+        loadInstrumentImages();
+        initGame();
+        return true;
+    }
+
+    function stopCurrentMix() {
+        cancelBonusMode(false);
+        silenceAllSlotAudio();
+        stopClock();
+        gTime = 0;
+        lastLoopIndex = 0;
+        input.isDown = false;
+        input.dragItem = null;
+        input.dragSource = null;
+        bonusVisualProgress = 0;
+        bonusLastCount = 0;
+        bonusBump = 0;
+    }
+
+    function startClock() {
+        if (gRunning) return;
+        gRunning = true; gPaused = false;
+        gLastTs = performance.now();
+        lastLoopIndex = Math.floor(gTime / MASTER_LOOP_DURATION);
+        tickClock();
+    }
+    function tickClock() {
+        if (!gRunning) return;
+        const now = performance.now();
+        if (!gPaused) {
+            gTime += (now - gLastTs) / 1000;
+            const loopIndex = Math.floor(gTime / MASTER_LOOP_DURATION);
+            activateReadySlots();
+            updateBonusPlaybackState();
+            if (loopIndex !== lastLoopIndex) {
+                lastLoopIndex = loopIndex;
+                if (!bonusSongPlaying) syncAllSlotAudio(true);
+            } else if (!bonusSongPlaying) {
+                syncAllSlotAudio(false);
+            }
+        }
+        gLastTs = now;
+        gRafId = requestAnimationFrame(tickClock);
+    }
+    function stopClock() {
+        gRunning = false; gPaused = false;
+        if (gRafId) { cancelAnimationFrame(gRafId); gRafId = null; }
+    }
+
+    function getLoopTime() {
+        if (!MASTER_LOOP_DURATION) return 0;
+        return gTime % MASTER_LOOP_DURATION;
+    }
+
+    function getNextEntryLoopTime() {
+        const loopTime = getLoopTime();
+        const nextSegment = Math.ceil((loopTime + 0.001) / ENTRY_SEGMENT_DURATION) * ENTRY_SEGMENT_DURATION;
+        return nextSegment >= MASTER_LOOP_DURATION ? 0 : nextSegment;
+    }
+
+    function getWaitProgress(slot) {
+        if (!slot || !slot.waiting) return 1;
+        const duration = Math.max(0.001, slot.waitEndTime - slot.waitStartTime);
+        return Math.max(0, Math.min(1, (gTime - slot.waitStartTime) / duration));
+    }
+
+    function getBonusWaitProgress() {
+        if (!bonusPending) return 0;
+        const duration = Math.max(0.001, bonusWaitEndTime - bonusWaitStartTime);
+        return Math.max(0, Math.min(1, (gTime - bonusWaitStartTime) / duration));
+    }
+
+    function getBonusTrackDuration() {
+        if (bonusSongAudio && Number.isFinite(bonusSongAudio.duration) && bonusSongAudio.duration > 0) {
+            return bonusSongAudio.duration;
+        }
+        return BONUS_TRACK_DURATION;
+    }
+
+    function getBonusTrackProgress() {
+        if (!bonusSongPlaying) return 0;
+        const duration = Math.max(0.001, getBonusTrackDuration());
+        if (bonusSongAudio && Number.isFinite(bonusSongAudio.currentTime)) {
+            return Math.max(0, Math.min(1, bonusSongAudio.currentTime / duration));
+        }
+        return Math.max(0, Math.min(1, ((performance.now() - bonusSongStartPerf) / 1000) / duration));
+    }
+
+    function isBonusReady() {
+        return getBonusActiveCount() >= TRACK_COUNT;
+    }
+
+    function isBonusClickable() {
+        return !!BONUS_TRACK_SRC && isBonusReady() && !bonusPending && !bonusSongPlaying;
+    }
+
+    function isBonusModeActive() {
+        return bonusPending || bonusSongPlaying || !!bonusSongAudio;
+    }
+
+    function isBonusCircleHit(pos) {
+        const dx = pos.x - BONUS_CIRCLE.x;
+        const dy = pos.y - BONUS_CIRCLE.y;
+        return Math.sqrt(dx * dx + dy * dy) <= BONUS_CIRCLE.outerRadius + 12;
+    }
+
+    function isLoopButtonHit(pos) {
+        const dx = pos.x - LOOP_PROGRESS_BUTTON.x;
+        const dy = pos.y - LOOP_PROGRESS_BUTTON.y;
+        return Math.sqrt(dx * dx + dy * dy) <= LOOP_PROGRESS_BUTTON.radius;
+    }
+
+    function requestBonusPlayback() {
+        if (!isBonusClickable()) return false;
+        unlockAudio();
+        if (!gRunning) startClock();
+        const loopTime = getLoopTime();
+        const triggerLoopTime = Math.max(0, MASTER_LOOP_DURATION - BONUS_PRE_ROLL_SECONDS);
+        // 右侧圆圈按整秒显示；进入“08s”这一档后点击，排到下一轮的触发点，避免立刻抢拍进入。
+        const triggerLockoutTime = Math.max(0, Math.floor(triggerLoopTime));
+        const useNextLoopTrigger = loopTime >= triggerLockoutTime;
+        const waitSeconds = useNextLoopTrigger
+            ? (MASTER_LOOP_DURATION - loopTime) + triggerLoopTime
+            : triggerLoopTime - loopTime;
+        const muteDelay = useNextLoopTrigger
+            ? waitSeconds + BONUS_PRE_ROLL_SECONDS
+            : MASTER_LOOP_DURATION - loopTime;
+        bonusPending = true;
+        bonusWaitStartTime = gTime;
+        bonusWaitEndTime = gTime + waitSeconds;
+        bonusMuteSlotsAtTime = gTime + muteDelay;
+        bonusSlotsSilenced = false;
+        if (waitSeconds <= 0.05) startBonusSong();
+        return true;
+    }
+
+    function updateBonusPlaybackState() {
+        if (bonusPending && gTime + 0.02 >= bonusWaitEndTime) {
+            startBonusSong();
+        }
+        if (bonusSongPlaying && !bonusSlotsSilenced && gTime + 0.02 >= bonusMuteSlotsAtTime) {
+            silenceAllSlotAudio();
+            bonusSlotsSilenced = true;
+        }
+        if (bonusSongPlaying && bonusSongAudio) {
+            const duration = getBonusTrackDuration();
+            if (bonusSongAudio.ended || bonusSongAudio.currentTime >= duration - 0.03) {
+                finishBonusSong();
+            }
+        }
+    }
+
+    function startBonusSong() {
+        if (bonusSongPlaying) return;
+        bonusPending = false;
+        prepareSlotsForBonusPlayback();
+        if (!bonusMuteSlotsAtTime || gTime + 0.02 >= bonusMuteSlotsAtTime) {
+            silenceAllSlotAudio();
+            bonusSlotsSilenced = true;
+        }
+
+        const a = new Audio(BONUS_TRACK_SRC);
+        a.loop = false;
+        bonusSongAudio = a;
+        bonusSongPlaying = true;
+        bonusSongStartPerf = performance.now();
+
+        const startPlay = () => {
+            if (bonusSongAudio !== a) return;
+            try {
+                a.currentTime = 0;
+                bonusSongStartPerf = performance.now();
+                a.play().catch(() => {
+                    if (bonusSongAudio !== a) return;
+                    bonusSongPlaying = false;
+                    stopBonusSongAudio();
+                    resumeActiveSlotAudio();
+                });
+            } catch (err) {
+                bonusSongPlaying = false;
+                stopBonusSongAudio();
+                resumeActiveSlotAudio();
+            }
+        };
+        a.addEventListener('ended', finishBonusSong, { once: true });
+        if (a.readyState >= 2) startPlay();
+        else a.addEventListener('canplay', startPlay, { once: true });
+        a.load();
+    }
+
+    function finishBonusSong() {
+        if (!bonusSongPlaying && !bonusSongAudio) return;
+        bonusPending = false;
+        bonusSongPlaying = false;
+        bonusMuteSlotsAtTime = 0;
+        bonusSlotsSilenced = false;
+        stopBonusSongAudio();
+        restartMixFromLoopStart();
+    }
+
+    function stopBonusSongAudio() {
+        if (!bonusSongAudio) return;
+        bonusSongAudio.pause();
+        bonusSongAudio.src = '';
+        bonusSongAudio = null;
+    }
+
+    function cancelBonusMode(resumeSlots = true) {
+        const wasActive = isBonusModeActive();
+        if (!wasActive) return false;
+        bonusPending = false;
+        bonusWaitStartTime = 0;
+        bonusWaitEndTime = 0;
+        bonusSongPlaying = false;
+        bonusMuteSlotsAtTime = 0;
+        bonusSlotsSilenced = false;
+        stopBonusSongAudio();
+        if (resumeSlots) resumeActiveSlotAudio();
+        return true;
+    }
+
+    function silenceAllSlotAudio() {
+        slotAudio.forEach((a, index) => {
+            if (!a) return;
+            a.pause();
+            a.src = '';
+            slotAudio[index] = null;
+        });
+    }
+
+    function resumeActiveSlotAudio() {
+        if (!slots.some(slot => slot.data && !slot.paused && !slot.waiting)) return;
+        if (!gRunning) startClock();
+        slots.forEach((slot, index) => {
+            if (!slot.data || slot.paused || slot.waiting || slotAudio[index]) return;
+            playSlotAudio(index, slot.data.id, false);
+        });
+    }
+
+    function clearSlotHoldState(slot) {
+        slot.paused = false;
+        slot.waiting = false;
+        slot.waitStartTime = 0;
+        slot.waitEndTime = 0;
+    }
+
+    function prepareSlotsForBonusPlayback() {
+        slots.forEach(slot => {
+            if (!slot.data) return;
+            clearSlotHoldState(slot);
+        });
+    }
+
+    function restartMixFromLoopStart() {
+        silenceAllSlotAudio();
+        slots.forEach(slot => {
+            if (!slot.data) return;
+            clearSlotHoldState(slot);
+        });
+        gTime = 0;
+        lastLoopIndex = 0;
+        gLastTs = performance.now();
+        if (!gRunning) startClock();
+        resumeActiveSlotAudio();
+    }
+
+    function hasPlayingInstrument(excludeSlotIdx = null) {
+        return slots.some((slot, index) => index !== excludeSlotIdx && slot.data && !slot.paused && !slot.waiting);
+    }
+
+    function seekAndPlayAudio(a, instId, restart = false) {
+        const duration = AUDIO_DURATION[instId] || a.duration || MASTER_LOOP_DURATION;
+        const loopTime = getLoopTime();
+        try {
+            if (loopTime >= duration) {
+                a.pause();
+                a.currentTime = Math.max(0, duration - 0.001);
+                return;
+            }
+            if (restart || Math.abs(a.currentTime - loopTime) > 0.08 || a.paused) {
+                a.currentTime = Math.min(loopTime, duration - 0.001);
+            }
+            a.play().catch(() => {});
+        } catch (err) {
+            a.addEventListener('canplay', () => seekAndPlayAudio(a, instId, restart), { once: true });
+        }
+    }
+
+    function syncAllSlotAudio(restart = false) {
+        slots.forEach((slot, index) => {
+            const a = slotAudio[index];
+            if (!slot.data || slot.paused || slot.waiting || !a) return;
+            seekAndPlayAudio(a, slot.data.id, restart);
+        });
+    }
+
+    function activateReadySlots() {
+        if (bonusSongPlaying) return;
+        slots.forEach((slot, index) => {
+            if (!slot.data || !slot.waiting || slot.paused) return;
+            if (gTime + 0.02 < slot.waitEndTime) return;
+            slot.waiting = false;
+            playSlotAudio(index, slot.data.id, false);
+        });
+    }
+
+    // 放入乐器时启动音频
+    function playSlotAudio(slotIdx, instId, resetIfAlone = true) {
+        stopSlotAudio(slotIdx);
+        if (resetIfAlone && !hasPlayingInstrument(slotIdx)) gTime = 0;
+        if (!gRunning) startClock();
+        const src = AUDIO_SRC[instId];
+        if (!src) return;
+        const a = new Audio(src);
+        a.loop = false;
+        const startPlay = () => {
+            seekAndPlayAudio(a, instId, false);
+        };
+        if (a.readyState >= 2) { startPlay(); }
+        else { a.addEventListener('canplay', startPlay, { once: true }); }
+        slotAudio[slotIdx] = a;
+    }
+
+    function scheduleSlotEntry(slotIdx) {
+        const slot = slots[slotIdx];
+        if (!slot || !slot.data) return;
+        const targetLoopTime = getNextEntryLoopTime();
+        const loopTime = getLoopTime();
+        let waitSeconds = targetLoopTime > loopTime
+            ? targetLoopTime - loopTime
+            : MASTER_LOOP_DURATION - loopTime + targetLoopTime;
+        if (waitSeconds < 0.05) waitSeconds = ENTRY_SEGMENT_DURATION;
+        slot.waiting = true;
+        slot.waitStartTime = gTime;
+        slot.waitEndTime = gTime + waitSeconds;
+        if (!gRunning) startClock();
+    }
+
+    // 移除乐器时停止音频
+    function stopSlotAudio(slotIdx) {
+        const a = slotAudio[slotIdx];
+        if (a) { a.pause(); a.src = ''; slotAudio[slotIdx] = null; }
+        if (slots.length > 0 && slots.every(s => !s.data)) {
+            stopClock();
+            gTime = 0;
+            lastLoopIndex = 0;
+        }
+    }
+
+    // 暂停/继续单个槽位音频
+    function toggleSlotAudio(slotIdx, paused) {
+        const slot = slots[slotIdx];
+        const a = slotAudio[slotIdx];
+        if (!slot || !slot.data) return;
+        if (paused) {
+            if (a) a.pause();
+        } else {
+            if (!hasPlayingInstrument(slotIdx)) gTime = 0;
+            if (!gRunning) startClock();
+            if (a) {
+                seekAndPlayAudio(a, slot.data.id, false);
+            } else {
+                playSlotAudio(slotIdx, slot.data.id, false);
+            }
+        }
+    }
+
+    // --- 槽位操作复用 ---
+    function placeInstrumentToSlot(slotIdx, instData) {
+        const slot = slots[slotIdx];
+        if (!slot || !instData) return false;
+        const wasBonusActive = cancelBonusMode(false);
+        const hadPlayingBefore = hasPlayingInstrument();
+        slot.data = instData;
+        slot.paused = false;
+        slot.waiting = false;
+        slot.waitStartTime = 0;
+        slot.waitEndTime = 0;
+        if (hadPlayingBefore) {
+            scheduleSlotEntry(slotIdx);
+        } else {
+            playSlotAudio(slotIdx, instData.id, true);
+        }
+        for (let k = 0; k < 20; k++) {
+            createParticle(slot.x + slot.w / 2, slot.y + slot.h / 2, instData.color, -2);
+        }
+        if (wasBonusActive) resumeActiveSlotAudio();
+        return true;
+    }
+
+    function moveInstrumentToSlot(fromIdx, toIdx) {
+        if (fromIdx === toIdx) return false;
+        const fromSlot = slots[fromIdx];
+        const toSlot = slots[toIdx];
+        if (!fromSlot || !toSlot || !fromSlot.data) return false;
+
+        const wasBonusActive = cancelBonusMode(false);
+        const instData = fromSlot.data;
+        stopSlotAudio(fromIdx);
+        toSlot.data = instData;
+        toSlot.paused = false;
+        toSlot.waiting = fromSlot.waiting;
+        toSlot.waitStartTime = fromSlot.waitStartTime || 0;
+        toSlot.waitEndTime = fromSlot.waitEndTime || 0;
+        fromSlot.data = null;
+        fromSlot.paused = false;
+        fromSlot.waiting = false;
+        fromSlot.waitStartTime = 0;
+        fromSlot.waitEndTime = 0;
+        if (toSlot.waiting) {
+            slotAudio[toIdx] = null;
+        } else {
+            playSlotAudio(toIdx, instData.id, false);
+        }
+        if (wasBonusActive) resumeActiveSlotAudio();
+        return true;
+    }
+
+    function removeInstrumentFromSlot(slotIdx, particleX, particleY) {
+        const slot = slots[slotIdx];
+        if (!slot || !slot.data) return false;
+        const wasBonusActive = cancelBonusMode(false);
+        slot.data = null;
+        slot.paused = false;
+        slot.waiting = false;
+        slot.waitStartTime = 0;
+        slot.waitEndTime = 0;
+        stopSlotAudio(slotIdx);
+        const px = particleX !== undefined ? particleX : (slot.x + slot.w / 2);
+        const py = particleY !== undefined ? particleY : (slot.y + slot.h / 2);
+        for (let k = 0; k < 15; k++) createParticle(px, py, "#888", 1);
+        if (wasBonusActive) resumeActiveSlotAudio();
+        return true;
+    }
+
+    function toggleSlotPauseState(slotIdx) {
+        const slot = slots[slotIdx];
+        if (!slot || !slot.data) return false;
+        const wasBonusActive = cancelBonusMode(false);
+        slot.paused = !slot.paused;
+        if (!slot.paused) slot.waiting = false;
+        toggleSlotAudio(slotIdx, slot.paused);
+        if (slot.paused && !hasPlayingInstrument()) {
+            stopClock();
+            gTime = 0;
+            lastLoopIndex = 0;
+        }
+        if (wasBonusActive) resumeActiveSlotAudio();
+        return true;
+    }
+
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        applySongConfig(activeSongId);
+        loadInstrumentImages();
+        initGame();
+    }
+
+    function loadInstrumentImages() {
+        instrumentImages = {};
+        spriteFrames = {};
+        spriteBoundsCache = new WeakMap();
+        spriteSourceBounds = {};
+        Object.entries(ICON_SRC).forEach(([instId, src]) => {
+            const img = new Image();
+            img.onload = () => { instrumentImages[instId] = img; };
+            img.onerror = () => { console.warn(`Failed to load instrument icon: ${src}`); };
+            img.src = src;
+        });
+        Object.entries(SPRITE_FRAME_FILES).forEach(([instId, files]) => {
+            spriteFrames[instId] = files.map(src => {
+                const img = new Image();
+                img.onerror = () => { console.warn(`Failed to load ${instId} frame: ${src}`); };
+                img.src = src;
+                return img;
+            });
+        });
+    }
+
+    function pushDockGroup(ids, startX, y, itemW, itemH, itemGap) {
+        ids.forEach((instId, index) => {
+            const itemX = startX + index * (itemW + itemGap);
+            dockItems.push({
+                x: itemX,
+                y,
+                w: itemW,
+                h: itemH,
+                data: INSTRUMENT_MAP[instId],
+                baseX: itemX,
+                baseY: y
+            });
+        });
+    }
+
+    function initGame() {
+        slots = [];
+        dockItems = [];
+        slotAudio = new Array(TRACK_COUNT).fill(null);
+
+        const slotW = 146;
+        const slotH = 338;
+        const slotGap = 24;
+        const slotY = 146;
+        const totalW = TRACK_COUNT * slotW + (TRACK_COUNT - 1) * slotGap;
+        const startX = (CONFIG.width - totalW) / 2;
+
+        for (let i = 0; i < TRACK_COUNT; i++) {
+            slots.push({
+                x: startX + i * (slotW + slotGap),
+                y: slotY,
+                w: slotW,
+                h: slotH,
+                data: null,
+                paused: false,
+                waiting: false,
+                waitStartTime: 0,
+                waitEndTime: 0
+            });
+        }
+
+        const itemW = 106;
+        const itemH = 112;
+        const itemGap = 28;
+        const clusterGap = 0;
+        const rowY = [586];
+
+        DOCK_ROWS.forEach((row, rowIndex) => {
+            const groupWidth = ids => ids.length ? ids.length * itemW + (ids.length - 1) * itemGap : 0;
+            const leftWidth = groupWidth(row.left);
+            const rightWidth = groupWidth(row.right);
+            const activeClusterGap = leftWidth && rightWidth ? clusterGap : 0;
+            const rowWidth = leftWidth + activeClusterGap + rightWidth;
+            const startRowX = (CONFIG.width - rowWidth) / 2;
+            pushDockGroup(row.left, startRowX, rowY[rowIndex], itemW, itemH, itemGap);
+            pushDockGroup(row.right, startRowX + leftWidth + activeClusterGap, rowY[rowIndex], itemW, itemH, itemGap);
+        });
+
+        loadingDiv.style.display = 'none';
+        if (!loopStarted) {
+            loopStarted = true;
+            loop();
+        }
+    }
+
+    function resize() {
+        let aspect = CONFIG.width / CONFIG.height;
+        let windowAspect = window.innerWidth / window.innerHeight;
+        let scale;
+        if (windowAspect < aspect) scale = window.innerWidth / CONFIG.width;
+        else scale = window.innerHeight / CONFIG.height;
+
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        const cssW = CONFIG.width * scale;
+        const cssH = CONFIG.height * scale;
+
+        canvas.style.width = `${cssW}px`;
+        canvas.style.height = `${cssH}px`;
+        canvas.width = Math.round(CONFIG.width * dpr);
+        canvas.height = Math.round(CONFIG.height * dpr);
+
+        // 逻辑坐标仍以 CONFIG 为准，内部按 DPR 放大渲染，避免高清素材发糊
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+    }
+
+    function update() {
+        time += 0.015;
+        updateBonusCircleState();
+
+// 粒子更新
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.y -= p.speed;
+            p.x += Math.sin(time * 2 + p.seed) * 0.5;
+            p.life--;
+            p.alpha = p.life / 60;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        if (Math.random() < 0.2) {
+            createParticle(Math.random() * CONFIG.width, CONFIG.height, 'rgba(255,255,255,0.1)', 0.5);
+        }
+    }
+
+    function updateBonusCircleState() {
+        const activeCount = getBonusActiveCount();
+        const target = activeCount / TRACK_COUNT;
+        if (activeCount !== bonusLastCount) {
+            const increased = activeCount > bonusLastCount;
+            bonusBump = increased ? 1 : 0;
+            bonusLastCount = activeCount;
+            if (increased) {
+                for (let i = 0; i < 10; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = BONUS_CIRCLE.outerRadius * (0.55 + Math.random() * 0.55);
+                    createParticle(
+                        BONUS_CIRCLE.x + Math.cos(angle) * dist,
+                        BONUS_CIRCLE.y + Math.sin(angle) * dist,
+                        activeCount >= TRACK_COUNT ? 'rgba(53,191,99,0.8)' : 'rgba(140,224,130,0.65)',
+                        0.8
+                    );
+                }
+            }
+        }
+        bonusVisualProgress += (target - bonusVisualProgress) * 0.13;
+        if (Math.abs(target - bonusVisualProgress) < 0.002) bonusVisualProgress = target;
+        bonusBump *= 0.86;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, CONFIG.width, CONFIG.height);
+
+// 1. 标题区
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "bold 32px serif";
+        ctx.letterSpacing = "14px";
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = "rgba(212,175,55,0.18)";
+        ctx.fillStyle = CONFIG.colors.gold;
+        ctx.fillText("赤 峰 雅 乐", CONFIG.width / 2, 88);
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(212,175,55,0.18)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(CONFIG.width / 2 - 118, 113);
+        ctx.lineTo(CONFIG.width / 2 + 118, 113);
+        ctx.stroke();
+        ctx.letterSpacing = "0px";
+        ctx.textBaseline = "alphabetic";
+        ctx.restore();
+        drawBonusCircle(ctx);
+        drawBonusWaitBar(ctx);
+        drawSongSwitcher(ctx);
+        drawLoopProgress(ctx);
+
+// 2. 绘制插槽 (Stage)
+        slots.forEach((slot, index) => {
+            let isActive = slot.data !== null;
+            let isPaused = slot.paused;
+            drawAncientPillar(ctx, slot.x, slot.y, slot.w, slot.h, index, slot.data, isPaused, slot.waiting);
+
+            if (isActive) {
+                if (input.dragSource === index && input.dragItem) ctx.globalAlpha = 0.26;
+                drawStageInstrument(ctx, slot);
+                ctx.globalAlpha = 1.0;
+            }
+        });
+        drawBonusTrackProgress(ctx);
+
+// 3. 粒子特效
+        ctx.globalCompositeOperation = 'lighter';
+        particles.forEach(p => {
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            ctx.fill();
+        });
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+
+// 4. 底部 Dock
+        drawDock();
+
+// 5. 拖拽物
+        if (input.isDown && input.dragItem) {
+            drawStoneIcon(ctx, input.x - 52, input.y - 52, 104, 104, input.dragItem.color, input.dragItem.id, true, false, false);
+        }
+    }
+
+    // --- 图形绘制逻辑 ---
+
+    function drawLoopProgress(ctx) {
+        const cx = LOOP_PROGRESS_BUTTON.x;
+        const cy = LOOP_PROGRESS_BUTTON.y;
+        const radius = 34;
+        const progress = MASTER_LOOP_DURATION ? getLoopTime() / MASTER_LOOP_DURATION : 0;
+        const loopTime = getLoopTime();
+        const cancelMode = isBonusModeActive();
+        const hover = cancelMode && isLoopButtonHit(input);
+
+        ctx.save();
+        ctx.fillStyle = cancelMode ? 'rgba(255,248,248,0.92)' : 'rgba(255,255,255,0.82)';
+        ctx.strokeStyle = cancelMode ? 'rgba(200,93,79,0.5)' : 'rgba(212,175,55,0.36)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius + 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = cancelMode ? 'rgba(200,93,79,0.18)' : 'rgba(148,163,184,0.45)';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = cancelMode ? (hover ? '#b63e34' : '#c85d4f') : CONFIG.colors.gold;
+        ctx.lineCap = 'round';
+        ctx.lineWidth = cancelMode && hover ? 7 : 6;
+        ctx.beginPath();
+        if (cancelMode) {
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        } else {
+            ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+        }
+        ctx.stroke();
+
+        ctx.textAlign = 'center';
+        if (cancelMode) {
+            ctx.fillStyle = hover ? '#9f2f25' : '#c85d4f';
+            ctx.font = 'bold 24px "Microsoft YaHei", sans-serif';
+            ctx.fillText('×', cx, cy + 8);
+        } else {
+            ctx.fillStyle = '#1f2937';
+            ctx.font = '13px "Microsoft YaHei", sans-serif';
+            ctx.fillText(`${Math.floor(loopTime).toString().padStart(2, '0')}s`, cx, cy + 4);
+        }
+        ctx.restore();
+    }
+
+    function drawSongSwitcher(ctx) {
+        const songs = Object.values(SONG_CONFIGS);
+        const buttonW = (SONG_SWITCH.w - SONG_SWITCH.gap) / songs.length;
+        ctx.save();
+        ctx.font = '13px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center';
+        songs.forEach((song, index) => {
+            const x = SONG_SWITCH.x + index * (buttonW + SONG_SWITCH.gap);
+            const y = SONG_SWITCH.y;
+            const active = song.id === activeSongId;
+            ctx.shadowColor = active ? 'rgba(139,107,24,0.18)' : 'rgba(31,41,55,0.06)';
+            ctx.shadowBlur = active ? 12 : 6;
+            ctx.fillStyle = active ? '#4a2f00' : 'rgba(255,255,255,0.86)';
+            ctx.strokeStyle = active ? CONFIG.colors.gold : 'rgba(203,213,225,0.95)';
+            ctx.lineWidth = active ? 1.5 : 1;
+            ctx.beginPath();
+            ctx.roundRect(x, y, buttonW, SONG_SWITCH.h, 19);
+            ctx.fill();
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = active ? '#f5cf5d' : '#667085';
+            ctx.fillText(song.switchLabel, x + buttonW / 2, y + 22);
+        });
+        ctx.restore();
+    }
+
+    function getSongSwitchHit(pos) {
+        const songs = Object.values(SONG_CONFIGS);
+        const buttonW = (SONG_SWITCH.w - SONG_SWITCH.gap) / songs.length;
+        for (let i = 0; i < songs.length; i++) {
+            const rect = {
+                x: SONG_SWITCH.x + i * (buttonW + SONG_SWITCH.gap),
+                y: SONG_SWITCH.y,
+                w: buttonW,
+                h: SONG_SWITCH.h
+            };
+            if (isInside(pos, rect)) return songs[i].id;
+        }
+        return null;
+    }
+
+    function drawBonusCircle(ctx) {
+        const activeCount = getBonusActiveCount();
+        const complete = activeCount >= TRACK_COUNT && bonusVisualProgress > 0.985;
+        const clickable = isBonusClickable();
+        const hover = clickable && isBonusCircleHit(input);
+        const pulse = complete
+            ? 1 + Math.sin(time * 4.2) * (hover ? 0.085 : 0.055) + (hover ? 0.06 : 0)
+            : 1 + bonusBump * 0.16;
+        const cx = BONUS_CIRCLE.x;
+        const cy = BONUS_CIRCLE.y;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(pulse, pulse);
+        drawBonusPopRing(ctx, bonusBump);
+        if (clickable) drawBonusReadyEffect(ctx, hover);
+
+        if (complete) {
+            ctx.shadowColor = 'rgba(53,191,99,0.34)';
+            ctx.shadowBlur = 26 + Math.sin(time * 4.2) * 8;
+            const fullGrad = ctx.createRadialGradient(-12, -14, 4, 0, 0, BONUS_CIRCLE.radius + 10);
+            fullGrad.addColorStop(0, '#70ec99');
+            fullGrad.addColorStop(0.62, '#35bf63');
+            fullGrad.addColorStop(1, '#269c51');
+            ctx.fillStyle = fullGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, BONUS_CIRCLE.radius + 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(255,255,255,0.18)';
+            ctx.beginPath();
+            ctx.arc(-10, -12, 8, 0, Math.PI * 2);
+            ctx.fill();
+            drawBonusMicIcon(ctx, 0, 0, 0.9, '#ffffff', '#35bf63');
+            ctx.restore();
+            if (clickable) drawBonusReadyHint(ctx, cx, cy, hover);
+            return;
+        }
+
+        ctx.fillStyle = 'rgba(255,255,255,0.88)';
+        ctx.beginPath();
+        ctx.arc(0, 0, BONUS_CIRCLE.outerRadius - 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        const idleGrad = ctx.createRadialGradient(-8, -11, 4, 0, 0, 24);
+        idleGrad.addColorStop(0, '#95a4b8');
+        idleGrad.addColorStop(1, '#5f6f84');
+        ctx.fillStyle = idleGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+
+        drawBonusSegments(ctx, 28, 8, Math.max(0, Math.min(1, bonusVisualProgress)));
+        drawBonusMicIcon(ctx, 0, 0, 0.68, '#ffffff', '#607085');
+
+        ctx.restore();
+    }
+
+    function drawBonusReadyEffect(ctx, hover) {
+        const alpha = hover ? 0.56 : 0.36;
+        const ringPulse = (Math.sin(time * 5.5) + 1) / 2;
+        ctx.save();
+        ctx.globalAlpha = alpha * (0.72 + ringPulse * 0.28);
+        ctx.strokeStyle = '#35bf63';
+        ctx.lineWidth = hover ? 3 : 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, BONUS_CIRCLE.outerRadius + 3 + ringPulse * 5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.globalAlpha = hover ? 0.8 : 0.55;
+        ctx.strokeStyle = 'rgba(112,236,153,0.95)';
+        ctx.setLineDash([3, 7]);
+        ctx.lineDashOffset = -time * 42;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, BONUS_CIRCLE.outerRadius + 10, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        for (let i = 0; i < 6; i++) {
+            const angle = time * 1.7 + i * Math.PI / 3;
+            const r = BONUS_CIRCLE.outerRadius + 7 + Math.sin(time * 3 + i) * 2;
+            ctx.globalAlpha = hover ? 0.82 : 0.52;
+            ctx.fillStyle = '#70ec99';
+            ctx.beginPath();
+            ctx.arc(Math.cos(angle) * r, Math.sin(angle) * r, hover ? 2.2 : 1.7, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    function drawBonusReadyHint(ctx, cx, cy, hover) {
+        const label = '点击播放';
+        const w = hover ? 62 : 56;
+        const h = 18;
+        const x = cx - w / 2;
+        const y = cy + BONUS_CIRCLE.outerRadius + 8;
+        ctx.save();
+        ctx.globalAlpha = hover ? 1 : 0.84 + Math.sin(time * 4.2) * 0.12;
+        ctx.shadowColor = 'rgba(53,191,99,0.2)';
+        ctx.shadowBlur = hover ? 14 : 9;
+        ctx.fillStyle = hover ? '#269c51' : 'rgba(53,191,99,0.92)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, h / 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '10px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, cx, y + 13);
+        ctx.restore();
+    }
+
+    function drawBonusPopRing(ctx, strength) {
+        if (strength <= 0.035) return;
+        const expansion = (1 - strength) * 18;
+        ctx.save();
+        ctx.globalAlpha = Math.min(0.9, strength);
+        ctx.strokeStyle = BONUS_CIRCLE.dashColor;
+        ctx.lineWidth = 4;
+        ctx.setLineDash([7, 6]);
+        ctx.lineDashOffset = -time * 24;
+        ctx.beginPath();
+        ctx.arc(0, 0, BONUS_CIRCLE.outerRadius + expansion, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawBonusSegments(ctx, radius, lineWidth, progress) {
+        if (progress <= 0) return;
+        const start = -Math.PI / 2;
+        ctx.save();
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'butt';
+        ctx.strokeStyle = BONUS_CIRCLE.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, start, start + Math.PI * 2 * progress);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawBonusWaitBar(ctx) {
+        if (!bonusPending) return;
+        const progress = getBonusWaitProgress();
+        const w = 66;
+        const h = 5;
+        const x = BONUS_CIRCLE.x - w / 2;
+        const y = BONUS_CIRCLE.y + BONUS_CIRCLE.outerRadius + 10;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(203,213,225,0.5)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, h / 2);
+        ctx.fill();
+        const grad = ctx.createLinearGradient(x, y, x + w, y);
+        grad.addColorStop(0, '#88e1a0');
+        grad.addColorStop(1, '#35bf63');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w * progress, h, h / 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function drawBonusTrackProgress(ctx) {
+        if (!bonusSongPlaying) return;
+        const progress = getBonusTrackProgress();
+        const w = 680;
+        const h = 8;
+        const x = (CONFIG.width - w) / 2;
+        const y = 520;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(53,191,99,0.18)';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = 'rgba(203,213,225,0.36)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, h / 2);
+        ctx.fill();
+
+        const grad = ctx.createLinearGradient(x, y, x + w, y);
+        grad.addColorStop(0, '#70ec99');
+        grad.addColorStop(0.55, '#35bf63');
+        grad.addColorStop(1, '#218f4b');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w * progress, h, h / 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function drawBonusMicIcon(ctx, cx, cy, scale, color, cutColor = 'rgba(255,255,255,0.28)') {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(scale, scale);
+        ctx.rotate(-0.62);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.lineWidth = 8.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -1);
+        ctx.lineTo(0, 23);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.roundRect(-9, -25, 18, 29, 9);
+        ctx.fill();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(-9, -25, 18, 29, 9);
+        ctx.clip();
+        ctx.strokeStyle = cutColor;
+        ctx.globalAlpha = 0.58;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-8, -20);
+        ctx.lineTo(7, -11);
+        ctx.moveTo(-8, -13);
+        ctx.lineTo(8, -4);
+        ctx.stroke();
+        ctx.restore();
+        ctx.restore();
+    }
+
+    function getBonusActiveCount() {
+        return slots.filter(slot => slot.data).length;
+    }
+
+    // 兼容旧入口：现阶段统一使用静态乐器卡片
+    function drawSpriteAnimation(ctx, slot) {
+        drawStageInstrument(ctx, slot);
+    }
+
+    // --- 图形绘制逻辑 ---
+
+    function drawAncientPillar(ctx, x, y, w, h, index, data = null, isPaused = false, isWaiting = false) {
+        const cx = x + w / 2;
+        const accent = data ? data.color : '#d9e0ea';
+        const border = data ? accent : '#d8dee8';
+
+        ctx.save();
+        ctx.shadowColor = data ? `${accent}22` : 'rgba(31, 41, 55, 0.08)';
+        ctx.shadowBlur = data ? 28 : 16;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = border;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 20);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        if (data) return;
+
+        const innerX = x + 12;
+        const innerY = y + 12;
+        const innerW = w - 24;
+        const innerH = h - 24;
+        const innerGrad = ctx.createLinearGradient(innerX, innerY, innerX, innerY + innerH);
+        innerGrad.addColorStop(0, 'rgba(248,250,253,0.98)');
+        innerGrad.addColorStop(1, 'rgba(239,244,250,0.9)');
+        ctx.fillStyle = innerGrad;
+        ctx.beginPath();
+        ctx.roundRect(innerX, innerY, innerW, innerH, 16);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = data ? accent : '#cfd8e3';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(cx - 30, y + 18, 60, 24, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#667085';
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`音轨 ${index + 1}`, cx, y + 34);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '13px "Microsoft YaHei", sans-serif';
+        ctx.fillText('拖拽乐器', cx, y + h - 56);
+        ctx.font = '12px "Microsoft YaHei", sans-serif';
+        ctx.fillText('到这里开始演奏', cx, y + h - 36);
+    }
+
+    function drawStageInstrument(ctx, slot) {
+        const { data, paused } = slot;
+        if (!data) return;
+
+        const bonusActive = isBonusModeActive();
+        const muted = !bonusActive && (paused || slot.waiting);
+        const accent = muted ? '#a8b2c4' : data.color;
+        const circleX = slot.x + slot.w / 2;
+        const circleY = slot.y + 126;
+
+        if (drawInstrumentSprite(ctx, slot, data.id, { muted, firstFrame: muted })) {
+            // 精灵动画优先；等待和暂停时显示灰色定格帧。
+        } else {
+            ctx.save();
+            ctx.shadowColor = muted ? 'rgba(148,163,184,0.15)' : `${accent}40`;
+            ctx.shadowBlur = muted ? 8 : 24;
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(circleX, circleY, 42, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            drawInstrumentIcon(ctx, circleX, circleY, 78, data.id, muted);
+            ctx.restore();
+        }
+
+        ctx.fillStyle = '#1f2937';
+        ctx.font = '16px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(data.name, circleX, slot.y + slot.h - 38);
+        if (slot.waiting && !bonusActive) drawWaitingProgress(ctx, circleX, slot.y + slot.h - 16, getWaitProgress(slot), data.color);
+    }
+
+    function drawKeyboardSprite(ctx, slot) {
+        if (!drawInstrumentSprite(ctx, slot, 'keyboard')) {
+            drawInstrumentIcon(ctx, slot.x + slot.w / 2, slot.y + 126, 78, 'keyboard', false);
+        }
+    }
+
+    function drawInstrumentSprite(ctx, slot, instId, options = {}) {
+        const frames = spriteFrames[instId] || [];
+        const usableFrames = frames.filter(img => img && img.complete && img.naturalWidth > 0);
+        if (!usableFrames.length) {
+            return false;
+        }
+        const elapsed = ((gTime % 2) + 2) % 2;
+        const frameIndex = options.firstFrame ? 0 : Math.floor((elapsed / 2) * frames.length) % frames.length;
+        const frame = frames[frameIndex] && frames[frameIndex].complete ? frames[frameIndex] : usableFrames[0];
+        const cfg = SPRITE_DRAW_CONFIG[instId] || SPRITE_DRAW_CONFIG.default;
+        ctx.save();
+        if (options.muted) {
+            ctx.filter = 'grayscale(1) saturate(0.08) opacity(0.62)';
+            ctx.shadowColor = 'rgba(100,116,139,0.12)';
+            ctx.shadowBlur = 8;
+        } else {
+            ctx.shadowColor = 'rgba(89,111,168,0.25)';
+            ctx.shadowBlur = 22;
+        }
+        const bounds = getSpriteSourceBounds(instId, usableFrames[0]);
+        drawImageContentFitHeight(
+            ctx,
+            frame,
+            bounds,
+            slot.x + slot.w / 2 + cfg.offsetX,
+            slot.y + cfg.top,
+            cfg.height
+        );
+        ctx.restore();
+        return true;
+    }
+
+    function getSpriteSourceBounds(instId, frame) {
+        if (spriteSourceBounds[instId]) return spriteSourceBounds[instId];
+        const raw = getImageAlphaBounds(frame);
+        const padX = Math.round(raw.w * 0.035);
+        const padY = Math.round(raw.h * 0.025);
+        const bounds = {
+            x: Math.max(0, raw.x - padX),
+            y: Math.max(0, raw.y - padY),
+            w: Math.min(frame.naturalWidth - Math.max(0, raw.x - padX), raw.w + padX * 2),
+            h: Math.min(frame.naturalHeight - Math.max(0, raw.y - padY), raw.h + padY * 2)
+        };
+        spriteSourceBounds[instId] = bounds;
+        return bounds;
+    }
+
+    function getImageAlphaBounds(img) {
+        if (spriteBoundsCache.has(img)) return spriteBoundsCache.get(img);
+        const fallback = { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
+        try {
+            const scanCanvas = document.createElement('canvas');
+            scanCanvas.width = img.naturalWidth;
+            scanCanvas.height = img.naturalHeight;
+            const scanCtx = scanCanvas.getContext('2d');
+            scanCtx.drawImage(img, 0, 0);
+            const { data, width, height } = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+            let minX = width;
+            let minY = height;
+            let maxX = -1;
+            let maxY = -1;
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    if (data[(y * width + x) * 4 + 3] > 8) {
+                        if (x < minX) minX = x;
+                        if (y < minY) minY = y;
+                        if (x > maxX) maxX = x;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+            const bounds = maxX >= 0
+                ? { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 }
+                : fallback;
+            spriteBoundsCache.set(img, bounds);
+            return bounds;
+        } catch (err) {
+            spriteBoundsCache.set(img, fallback);
+            return fallback;
+        }
+    }
+
+    function drawImageContentFitHeight(ctx, img, bounds, centerX, topY, targetH) {
+        const scale = targetH / bounds.h;
+        const drawW = bounds.w * scale;
+        ctx.drawImage(
+            img,
+            bounds.x,
+            bounds.y,
+            bounds.w,
+            bounds.h,
+            centerX - drawW / 2,
+            topY,
+            drawW,
+            targetH
+        );
+    }
+
+    function drawWaitingProgress(ctx, cx, cy, progress, color) {
+        const radius = 13;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(148,163,184,0.36)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = color;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawImageContain(ctx, img, x, y, w, h) {
+        const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+        const drawW = img.naturalWidth * scale;
+        const drawH = img.naturalHeight * scale;
+        ctx.drawImage(img, x + (w - drawW) / 2, y + (h - drawH) / 2, drawW, drawH);
+    }
+
+    function drawImageCover(ctx, img, x, y, w, h, source = null) {
+        const sx = source ? source.sx : 0;
+        const sy = source ? source.sy : 0;
+        const sw = source ? source.sw : img.naturalWidth;
+        const sh = source ? source.sh : img.naturalHeight;
+        const sourceAspect = sw / sh;
+        const targetAspect = w / h;
+        let cropX = sx;
+        let cropY = sy;
+        let cropW = sw;
+        let cropH = sh;
+        if (sourceAspect > targetAspect) {
+            cropW = sh * targetAspect;
+            cropX = sx + (sw - cropW) / 2;
+        } else {
+            cropH = sw / targetAspect;
+            cropY = sy + (sh - cropH) / 2;
+        }
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, x, y, w, h);
+    }
+
+    function drawMaskTotem(ctx, x, y, w, h, data, isPaused) {
+        drawStageInstrument(ctx, { x, y, w, h, data, paused: isPaused });
+    }
+
+    function drawDock() {
+        const dockTop = CONFIG.height - 158;
+        let grad = ctx.createLinearGradient(0, dockTop, 0, CONFIG.height);
+        grad.addColorStop(0, "rgba(255,255,255,0)");
+        grad.addColorStop(0.32, "rgba(247,249,252,0.78)");
+        grad.addColorStop(1, "rgba(235,240,247,0.98)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, dockTop, CONFIG.width, CONFIG.height - dockTop);
+
+        ctx.strokeStyle = "rgba(186,146,44,0.85)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, dockTop + 20);
+        ctx.lineTo(CONFIG.width, dockTop + 20);
+        ctx.stroke();
+
+        ctx.fillStyle = "#8b6b18";
+        ctx.font = '14px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = "center";
+        ctx.fillText("拖入音轨开始播放 · 拖回空白区域移除 · 点击原音轨可暂停", CONFIG.width / 2, dockTop + 12);
+
+        dockItems.forEach(item => {
+            if (input.dragItem === item.data && input.dragSource === 'dock') return;
+            const isDisabled = isInstrumentUsed(item.data.id);
+            drawStoneIcon(ctx, item.x, item.y, item.w, item.h, item.data.color, item.data.id, false, isDisabled, true);
+        });
+    }
+
+    /**
+     * Dock 乐器图标
+     */
+    function drawStoneIcon(ctx, x, y, w, h, color, id, isDragging, isDisabled = false, showLabel = true) {
+        const inst = INSTRUMENT_MAP[id];
+        const cx = x + w / 2;
+        const cy = showLabel ? y + 44 : y + h / 2;
+        const r = Math.min(w, showLabel ? 88 : w) / 2;
+        const ringColor = isDisabled ? "#b8c2d1" : color;
+        const topColor = isDisabled ? "#f3f5f8" : "#ffffff";
+        const bottomColor = isDisabled ? "#dbe3ee" : "#edf2f8";
+
+        if (isDragging && !isDisabled) {
+            ctx.shadowColor = `${color}55`;
+            ctx.shadowBlur = 24;
+        }
+
+        let grad = ctx.createLinearGradient(x, y, x, y + h);
+        grad.addColorStop(0, topColor);
+        grad.addColorStop(1, bottomColor);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r - 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = ringColor;
+        ctx.lineWidth = 1.5;
+        if (!isDragging && !isDisabled) {
+            ctx.shadowColor = `${color}33`;
+            ctx.shadowBlur = 8;
+        }
+        ctx.beginPath();
+        ctx.arc(cx, cy, r - 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        drawInstrumentIcon(ctx, cx, cy, showLabel ? 78 : 92, id, isDisabled);
+
+        if (showLabel && inst) {
+            ctx.fillStyle = isDisabled ? "#98a2b3" : "#475467";
+            ctx.font = '14px "Microsoft YaHei", sans-serif';
+            ctx.textAlign = "center";
+            ctx.fillText(inst.name, cx, y + h - 6);
+        }
+    }
+
+    function drawInstrumentIcon(ctx, cx, cy, size, id, isDisabled = false) {
+        const img = instrumentImages[id];
+        if (img && img.complete && img.naturalWidth > 0) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+            ctx.clip();
+            if (isDisabled) {
+                ctx.filter = 'grayscale(1) brightness(0.9)';
+                ctx.globalAlpha = 0.72;
+            }
+            const drawSize = Math.round(size * 1.08);
+            ctx.drawImage(img, Math.round(cx - drawSize / 2), Math.round(cy - drawSize / 2), drawSize, drawSize);
+            ctx.restore();
+            return;
+        }
+
+        const inst = INSTRUMENT_MAP[id];
+        const shapeColor = isDisabled ? "#9aa3b2" : (inst ? inst.color : "#667085");
+        ctx.save();
+        ctx.fillStyle = shapeColor;
+        ctx.strokeStyle = shapeColor;
+        ctx.shadowColor = `${shapeColor}22`;
+        ctx.shadowBlur = isDisabled ? 0 : 4;
+        drawInstrumentShape(ctx, cx, cy, id, shapeColor, size / 64);
+        ctx.restore();
+    }
+
+    function isInstrumentUsed(instId) {
+        return slots.some(slot => slot.data && slot.data.id === instId);
+    }
+
+    /**
+     * 根据乐器ID绘制具体图形
+     */
+    function drawInstrumentShape(ctx, cx, cy, id, color, scale = 1) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(scale, scale);
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+
+        const fillAccent = drawPath => {
+            ctx.save();
+            ctx.globalAlpha = 0.18;
+            drawPath();
+            ctx.fill();
+            ctx.restore();
+            drawPath();
+            ctx.stroke();
+        };
+
+        const normalizedId = {
+            china_drum: 'big_drum',
+            double_bass_song2: 'double_bass',
+            guzheng_song2: 'guzheng',
+            bamboo_flute_song2: 'flute',
+            synth_song2: 'keyboard'
+        }[id] || id;
+
+        switch (normalizedId) {
+            case 'snare':
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.ellipse(0, 2, 17, 10, 0, 0, Math.PI * 2);
+                });
+                ctx.beginPath();
+                ctx.moveTo(-12, 12);
+                ctx.lineTo(-15, 19);
+                ctx.moveTo(12, 12);
+                ctx.lineTo(15, 19);
+                ctx.moveTo(-12, -13);
+                ctx.lineTo(10, -20);
+                ctx.moveTo(12, -13);
+                ctx.lineTo(-10, -20);
+                ctx.stroke();
+                break;
+
+            case 'kick':
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.arc(0, 2, 17, 0, Math.PI * 2);
+                });
+                ctx.beginPath();
+                ctx.arc(0, 2, 9, 0, Math.PI * 2);
+                ctx.moveTo(-10, 17);
+                ctx.lineTo(-15, 23);
+                ctx.moveTo(10, 17);
+                ctx.lineTo(15, 23);
+                ctx.stroke();
+                break;
+
+            case 'cymbal':
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, 18, 7, 0, 0, Math.PI * 2);
+                });
+                ctx.beginPath();
+                ctx.moveTo(0, 7);
+                ctx.lineTo(0, 22);
+                ctx.moveTo(-11, 22);
+                ctx.lineTo(11, 22);
+                ctx.arc(0, -1, 3, 0, Math.PI * 2);
+                ctx.stroke();
+                break;
+
+            case 'bass':
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.moveTo(-16, 4);
+                    ctx.bezierCurveTo(-13, -11, -2, -13, 3, -5);
+                    ctx.bezierCurveTo(12, -8, 17, -2, 13, 8);
+                    ctx.bezierCurveTo(7, 20, -12, 17, -16, 4);
+                });
+                ctx.beginPath();
+                ctx.moveTo(9, -5);
+                ctx.lineTo(22, -18);
+                ctx.moveTo(12, -2);
+                ctx.lineTo(24, -14);
+                ctx.moveTo(-8, 0);
+                ctx.lineTo(10, 7);
+                ctx.stroke();
+                break;
+
+            case 'keyboard':
+                ctx.fillStyle = color;
+                ctx.fillRect(-20, -9, 40, 18);
+                ctx.fillStyle = '#fff';
+                for (let i = 0; i < 8; i++) ctx.fillRect(-18 + i * 4.5, -7, 4, 14);
+                ctx.fillStyle = '#111827';
+                for (let i = 0; i < 6; i++) {
+                    if (i === 2) continue;
+                    ctx.fillRect(-15 + i * 5.2, -7, 2.4, 8);
+                }
+                break;
+
+            case 'flute':
+                ctx.beginPath();
+                ctx.moveTo(-22, 9);
+                ctx.lineTo(18, -13);
+                ctx.stroke();
+                ctx.lineWidth = 1.7;
+                ctx.beginPath();
+                [-11, -4, 3, 10].forEach((dx, idx) => {
+                    const x = dx;
+                    const y = 2 - idx * 3.8;
+                    ctx.moveTo(x + 2.5, y);
+                    ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+                });
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(19, -14);
+                ctx.lineTo(24, -17);
+                ctx.stroke();
+                break;
+
+            case 'choir_song2':
+                ctx.lineWidth = 2.4;
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.arc(-9, -2, 8, 0, Math.PI * 2);
+                    ctx.arc(9, -2, 8, 0, Math.PI * 2);
+                    ctx.roundRect(-18, 9, 36, 15, 8);
+                });
+                ctx.beginPath();
+                ctx.moveTo(-3, -18);
+                ctx.quadraticCurveTo(9, -24, 13, -12);
+                ctx.moveTo(13, -12);
+                ctx.lineTo(13, 8);
+                ctx.arc(9, 8, 4, 0, Math.PI * 2);
+                ctx.stroke();
+                break;
+
+            case 'big_drum':
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.ellipse(0, 2, 16, 11, 0, 0, Math.PI * 2);
+                });
+                ctx.beginPath();
+                ctx.moveTo(-11, 12);
+                ctx.lineTo(-14, 18);
+                ctx.moveTo(11, 12);
+                ctx.lineTo(14, 18);
+                ctx.moveTo(-7, -11);
+                ctx.lineTo(11, -17);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(13, -18, 3, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+
+            case 'percussion':
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(-13, -11);
+                ctx.lineTo(12, 12);
+                ctx.moveTo(13, -11);
+                ctx.lineTo(-12, 12);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(-14, -12, 2.5, 0, Math.PI * 2);
+                ctx.arc(14, -12, 2.5, 0, Math.PI * 2);
+                ctx.arc(-13, 13, 2.5, 0, Math.PI * 2);
+                ctx.arc(13, 13, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+
+            case 'gong':
+                ctx.beginPath();
+                ctx.moveTo(-12, -14);
+                ctx.lineTo(-12, 12);
+                ctx.moveTo(12, -14);
+                ctx.lineTo(12, 12);
+                ctx.moveTo(-12, -14);
+                ctx.lineTo(12, -14);
+                ctx.stroke();
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.arc(0, 2, 10, 0, Math.PI * 2);
+                });
+                ctx.beginPath();
+                ctx.moveTo(13, 4);
+                ctx.lineTo(19, -1);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(20, -2, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+
+            case 'double_bass':
+                ctx.beginPath();
+                ctx.moveTo(0, -24);
+                ctx.lineTo(0, -9);
+                ctx.stroke();
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -12);
+                    ctx.bezierCurveTo(10, -10, 12, -2, 7, 7);
+                    ctx.bezierCurveTo(11, 14, 8, 20, 0, 23);
+                    ctx.bezierCurveTo(-8, 20, -11, 14, -7, 7);
+                    ctx.bezierCurveTo(-12, -2, -10, -10, 0, -12);
+                });
+                ctx.beginPath();
+                ctx.moveTo(-2, -22);
+                ctx.lineTo(-2, 18);
+                ctx.moveTo(2, -22);
+                ctx.lineTo(2, 18);
+                ctx.moveTo(0, 23);
+                ctx.lineTo(0, 28);
+                ctx.stroke();
+                break;
+
+            case 'cello':
+                ctx.beginPath();
+                ctx.moveTo(0, -20);
+                ctx.lineTo(0, -7);
+                ctx.stroke();
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -10);
+                    ctx.bezierCurveTo(9, -8, 10, -1, 6, 6);
+                    ctx.bezierCurveTo(9, 12, 7, 17, 0, 20);
+                    ctx.bezierCurveTo(-7, 17, -9, 12, -6, 6);
+                    ctx.bezierCurveTo(-10, -1, -9, -8, 0, -10);
+                });
+                ctx.beginPath();
+                ctx.moveTo(-2, -18);
+                ctx.lineTo(-2, 16);
+                ctx.moveTo(2, -18);
+                ctx.lineTo(2, 16);
+                ctx.moveTo(0, 20);
+                ctx.lineTo(0, 25);
+                ctx.stroke();
+                break;
+
+            case 'violin':
+                ctx.beginPath();
+                ctx.moveTo(0, -17);
+                ctx.lineTo(0, -6);
+                ctx.stroke();
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -8);
+                    ctx.bezierCurveTo(7, -7, 8, -1, 5, 4);
+                    ctx.bezierCurveTo(7, 8, 6, 12, 0, 14);
+                    ctx.bezierCurveTo(-6, 12, -7, 8, -5, 4);
+                    ctx.bezierCurveTo(-8, -1, -7, -7, 0, -8);
+                });
+                ctx.beginPath();
+                ctx.moveTo(-10, -11);
+                ctx.lineTo(10, 13);
+                ctx.moveTo(-1, -16);
+                ctx.lineTo(-1, 12);
+                ctx.moveTo(1, -16);
+                ctx.lineTo(1, 12);
+                ctx.stroke();
+                break;
+
+            case 'yangqin':
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.moveTo(-18, 10);
+                    ctx.lineTo(-12, -8);
+                    ctx.lineTo(12, -8);
+                    ctx.lineTo(18, 10);
+                    ctx.closePath();
+                });
+                ctx.beginPath();
+                ctx.moveTo(-10, -4);
+                ctx.lineTo(10, -4);
+                ctx.moveTo(-12, 0);
+                ctx.lineTo(12, 0);
+                ctx.moveTo(-14, 4);
+                ctx.lineTo(14, 4);
+                ctx.moveTo(-8, -16);
+                ctx.lineTo(-2, -8);
+                ctx.moveTo(8, -16);
+                ctx.lineTo(2, -8);
+                ctx.stroke();
+                break;
+
+            case 'guzheng':
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.roundRect(-18, -7, 36, 14, 7);
+                });
+                ctx.beginPath();
+                ctx.moveTo(-13, -4);
+                ctx.lineTo(13, -4);
+                ctx.moveTo(-13, 0);
+                ctx.lineTo(13, 0);
+                ctx.moveTo(-13, 4);
+                ctx.lineTo(13, 4);
+                ctx.moveTo(-8, -7);
+                ctx.lineTo(-8, 7);
+                ctx.moveTo(0, -7);
+                ctx.lineTo(0, 7);
+                ctx.moveTo(8, -7);
+                ctx.lineTo(8, 7);
+                ctx.stroke();
+                break;
+
+            case 'erhu':
+                ctx.beginPath();
+                ctx.moveTo(0, -21);
+                ctx.lineTo(0, 11);
+                ctx.moveTo(-10, 0);
+                ctx.lineTo(11, -4);
+                ctx.stroke();
+                fillAccent(() => {
+                    ctx.beginPath();
+                    ctx.roundRect(-5, 9, 10, 10, 2);
+                });
+                ctx.beginPath();
+                ctx.moveTo(-2, -18);
+                ctx.lineTo(-2, 18);
+                ctx.moveTo(2, -18);
+                ctx.lineTo(2, 18);
+                ctx.stroke();
+                break;
+
+            case 'woodwind':
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(-15, 10);
+                ctx.lineTo(12, -10);
+                ctx.stroke();
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(-7, 4, 1.4, 0, Math.PI * 2);
+                ctx.arc(-1, 0, 1.4, 0, Math.PI * 2);
+                ctx.arc(5, -4, 1.4, 0, Math.PI * 2);
+                ctx.arc(11, -8, 1.4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(12, -10);
+                ctx.lineTo(17, -13);
+                ctx.stroke();
+                break;
+
+            default:
+                ctx.font = '18px "Microsoft YaHei", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText("?", 0, 0);
+        }
+
+        ctx.restore();
+    }
+
+    // --- 粒子与工具 ---
+    function createParticle(x, y, color, speedFn) {
+        particles.push({
+            x: x, y: y,
+            size: Math.random() * 2,
+            color: color,
+            alpha: 1,
+            life: 40 + Math.random() * 60,
+            seed: Math.random() * 100,
+            speed: (Math.random() * 1 + 0.5) * (speedFn || 1)
+        });
+    }
+
+    // --- 输入处理 ---
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = CONFIG.width / rect.width;
+        const scaleY = CONFIG.height / rect.height;
+        let cx = e.clientX, cy = e.clientY;
+        if (e.changedTouches && e.changedTouches.length) {
+            cx = e.changedTouches[0].clientX; cy = e.changedTouches[0].clientY;
+        }
+        return { x: (cx - rect.left) * scaleX, y: (cy - rect.top) * scaleY };
+    }
+
+    function onDown(e) {
+        const pos = getPos(e);
+        input.x = pos.x; input.y = pos.y;
+        input.isDown = true;
+        input.dragItem = null; input.dragSource = null;
+        updateCanvasCursor(pos);
+
+        if (isBonusModeActive() && isLoopButtonHit(pos)) {
+            cancelBonusMode(true);
+            input.isDown = false;
+            updateCanvasCursor(pos);
+            return;
+        }
+
+        const selectedSongId = getSongSwitchHit(pos);
+        if (selectedSongId) {
+            selectSong(selectedSongId);
+            input.isDown = false;
+            updateCanvasCursor(pos);
+            return;
+        }
+
+        if (isBonusCircleHit(pos) && requestBonusPlayback()) {
+            input.isDown = false;
+            updateCanvasCursor(pos);
+            return;
+        }
+
+        for (let item of dockItems) {
+            if (isInside(pos, item) && !isInstrumentUsed(item.data.id)) {
+                input.dragItem = item.data; input.dragSource = 'dock'; return;
+            }
+        }
+        for (let i = 0; i < slots.length; i++) {
+            let slot = slots[i];
+            if (slot.data && isInside(pos, slot)) {
+                input.dragItem = slot.data; input.dragSource = i; return;
+            }
+        }
+    }
+
+    function onMove(e) {
+        e.preventDefault();
+        const pos = getPos(e);
+        input.x = pos.x; input.y = pos.y;
+        updateCanvasCursor(pos);
+        if (!input.isDown) return;
+    }
+
+    function onUp(e) {
+        e.preventDefault();
+        const pos = getPos(e);
+        input.isDown = false;
+
+        if (input.dragItem) {
+            let dropped = false;
+            for (let i = 0; i < slots.length; i++) {
+                let slot = slots[i];
+                if (isInside(pos, slot)) {
+                    if (input.dragSource === 'dock') {
+                        // 从乐器区拖入：放置并播放
+                        dropped = placeInstrumentToSlot(i, input.dragItem);
+                    } else if (input.dragSource !== null) {
+                        if (i === input.dragSource) {
+                            // 点击同一槽位：切换暂停
+                            dropped = toggleSlotPauseState(i);
+                        } else {
+                            // 拖到另一槽位：移动
+                            dropped = moveInstrumentToSlot(input.dragSource, i);
+                        }
+                    }
+                    break;
+                }
+            }
+            if (!dropped && input.dragSource !== 'dock' && input.dragSource !== null) {
+                // 拖出音轨：移除并停止音频
+                removeInstrumentFromSlot(input.dragSource, input.x, input.y);
+            }
+        }
+        input.dragItem = null; input.dragSource = null;
+        updateCanvasCursor(pos);
+    }
+
+    function updateCanvasCursor(pos = input) {
+        if (input.dragItem) {
+            canvas.style.cursor = 'grabbing';
+            return;
+        }
+        if ((isBonusClickable() && isBonusCircleHit(pos))
+            || (isBonusModeActive() && isLoopButtonHit(pos))
+            || getSongSwitchHit(pos)) {
+            canvas.style.cursor = 'pointer';
+            return;
+        }
+        if (dockItems.some(item => isInside(pos, item) && !isInstrumentUsed(item.data.id))) {
+            canvas.style.cursor = 'grab';
+            return;
+        }
+        if (slots.some(slot => slot.data && isInside(pos, slot))) {
+            canvas.style.cursor = 'grab';
+            return;
+        }
+        canvas.style.cursor = 'default';
+    }
+
+    function isInside(pos, rect) {
+        return pos.x > rect.x && pos.x < rect.x + rect.w && pos.y > rect.y && pos.y < rect.y + rect.h;
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    canvas.addEventListener('mousemove', onMove);
+    canvas.addEventListener('mouseup', onUp);
+    canvas.addEventListener('mouseleave', () => { canvas.style.cursor = 'default'; });
+    canvas.addEventListener('touchstart', onDown, {passive: false});
+    canvas.addEventListener('touchmove', onMove, {passive: false});
+    canvas.addEventListener('touchend', onUp, {passive: false});
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    init();
+
+    // =====================
+    // 曲谱库功能
+    // =====================
+
+    const MUSIC_DATA = [
+        { id:'1',  title:'庆寿',   cat:'大典', category:'礼仪音乐', instrument:'古筝', description:'《庆寿》是赤峰雅乐珍贵的传统祝寿曲目，源自明清宫廷，曲调庄重典雅，象征福寿绵长。', cover:'compose/庆寿.jpg',   scores:['compose/庆寿.jpg'] },
+        { id:'2',  title:'北正宫', cat:'大典', category:'宫廷音乐', instrument:'琵琶', description:'北正宫为古代宫廷雅乐，曲调典雅庄重，历史可追溯至明代，常用于重要庆典仪式。',           cover:'compose/北正宫.jpg', scores:['compose/北正宫.jpg'] },
+        { id:'3',  title:'水龙吟', cat:'大典', category:'民间音乐', instrument:'笛子', description:'水龙吟描绘水龙戏水的场景，音乐灵动活泼，节奏明快，是民间传统节日庆典中常见的欢快曲目。', cover:'compose/水龙吟.jpg', scores:['compose/水龙吟.jpg'] },
+        { id:'4',  title:'春来',   cat:'四季', category:'节令音乐', instrument:'琵琶', description:'春来为描绘春天景象的曲目，充满生机与活力，旋律明快舒展。',                               cover:'compose/春来.jpg',   scores:['compose/春来.jpg'] },
+        { id:'7',  title:'冬来',   cat:'四季', category:'节令音乐', instrument:'古琴', description:'冬来描绘北方严冬景象，曲调沉静深远，展现雪花飘落、冰封千里的壮丽景色。',               cover:'compose/冬来.jpg',   scores:['compose/冬来.jpg'] },
+        { id:'9',  title:'秋来',   cat:'四季', category:'节令音乐', instrument:'笛子', description:'秋来表现丰收季节的喜悦与祥和，曲调悠扬婉转，充满丰收的喜悦。',                       cover:'compose/秋来.jpg',   scores:['compose/秋来.jpg'] },
+        { id:'19', title:'夏来',   cat:'四季', category:'节令音乐', instrument:'古筝', description:'夏来是描绘夏季景象的节令音乐，表现了夏日的热烈与生机。',                               cover:'compose/夏来.jpg',   scores:['compose/夏来.jpg'] },
+        { id:'5',  title:'雁旋',   cat:'雁旋', category:'描写音乐', instrument:'古筝', description:'雁旋描绘大雁南飞的场景，曲调优美动人，表现出大雁在天空中盘旋的意境。',               cover:'compose/雁旋.jpg',   scores:['compose/雁旋.jpg'] },
+        { id:'12', title:'雁阵',   cat:'雁旋', category:'描写音乐', instrument:'二胡', description:'雁阵描绘大雁排列整齐的飞行队形，乐曲节奏整齐有序，表现出大雁南飞时的壮观景象。',     cover:'compose/雁阵.jpg',   scores:['compose/雁阵.jpg'] },
+        { id:'15', title:'雁落',   cat:'雁旋', category:'描写音乐', instrument:'琵琶', description:'雁落细腻刻画了大雁降落时的优雅姿态，逐渐减缓的节奏表现出大雁盘旋下降直至落地的全过程。', cover:'compose/雁落.jpg', scores:['compose/雁落.jpg'] },
+        { id:'16', title:'雁身',   cat:'雁旋', category:'描写音乐', instrument:'古琴', description:'雁身描绘大雁优美的体态和飞行时的姿态，旋律流畅优美。',                               cover:'compose/雁身.jpg',   scores:['compose/雁身.jpg'] },
+        { id:'17', title:'雁头',   cat:'雁旋', category:'描写音乐', instrument:'二胡', description:'雁头是描写大雁头部和领头大雁的曲目，表现领头大雁的责任与担当。',                     cover:'compose/雁头.jpg',   scores:['compose/雁头.jpg'] },
+        { id:'18', title:'雁尾',   cat:'雁旋', category:'描写音乐', instrument:'古筝', description:'雁尾描绘雁群飞行队伍的尾部，表现了雁群团结一致、紧随其后的和谐之美。',               cover:'compose/雁尾.jpg',   scores:['compose/雁尾.jpg'] },
+        { id:'6',  title:'龙尾',   cat:'龙腾', category:'民间音乐', instrument:'二胡', description:'龙尾是民间传统舞龙音乐的一部分，表现龙尾摆动的灵活与力量，节奏鲜明有力。',           cover:'compose/龙尾.jpg',   scores:['compose/龙尾.jpg'] },
+        { id:'11', title:'龙头',   cat:'龙腾', category:'民间音乐', instrument:'琵琶', description:'龙头为民间音乐精品，以龙首造型为灵感，气势磅礴，振奋人心。',                         cover:'compose/龙头.jpg',   scores:['compose/龙头.jpg'] },
+        { id:'21', title:'龙身',   cat:'龙腾', category:'民间音乐', instrument:'古琴', description:'龙身描绘了龙的身躯，曲调蜿蜒起伏，气势不凡。',                                         cover:'compose/龙身.jpg',   scores:['compose/龙身.jpg'] },
+        { id:'8',  title:'鹧鸪天', cat:'大典', category:'描写音乐', instrument:'古琴', description:'鹧鸪天取名自宋词词牌，乐曲模仿鹧鸪鸟的鸣叫，清脆悦耳，是赤峰雅乐中的精品之作。',   cover:'compose/鹧鸪天.jpg', scores:['compose/鹧鸪天.jpg'] },
+        { id:'22', title:'飞蝴蝶', cat:'大典', category:'描写音乐', instrument:'笛子', description:'飞蝴蝶以轻盈跳跃的旋律描绘蝴蝶翩翩起舞的美丽景象，充满春意盎然的自然气息。',           cover:'compose/飞蝴蝶.jpg', scores:['compose/飞蝴蝶.jpg'] },
+        { id:'23', title:'中风韵', cat:'大典', category:'宫廷音乐', instrument:'古筝', description:'中风韵是宫廷雅乐的经典曲目，融合了中原音乐文化的精髓，旋律典雅端庄。',               cover:'compose/中风韵.jpg', scores:['compose/中风韵.jpg'] },
+        { id:'10', title:'尾繁续', cat:'大典', category:'宫廷音乐', instrument:'古筝', description:'尾繁续是宫廷音乐的重要组成部分，结构复杂精巧，寓意繁荣延续。',                         cover:'compose/尾繁续.jpg', scores:['compose/尾繁续.jpg'] },
+        { id:'14', title:'小妹子', cat:'大典', category:'民间音乐', instrument:'古筝', description:'小妹子是流传于内蒙古赤峰地区的民间歌曲，旋律俏皮活泼，深受当地人喜爱。',             cover:'compose/小妹子.jpg', scores:['compose/小妹子.jpg'] },
+        { id:'20', title:'来尾',   cat:'四季', category:'节令音乐', instrument:'琵琶', description:'来尾是节令音乐系列的收尾曲目，寓意四季轮回、生生不息的自然规律。',                   cover:'compose/来尾.jpg',   scores:[{label:'简谱', url:'compose/来尾.jpg'}, {label:'五线谱', url:'compose/来尾五线谱.jpg.png'}], layout:'tabs' },
+        { id:'13', title:'鹧鸪地', cat:'大典', category:'描写音乐', instrument:'笛子', description:'鹧鸪地描述鹧鸪鸟在地面觅食、游走的情景，音乐轻快活泼。',                             cover:'compose/鹧鸪地.jpg', scores:['compose/鹧鸪地.jpg'] },
+    ];
+
+    let currentFilter = '全部';
+    let currentArchiveTab = 'scores';
+
+    const YAYUE_TIMELINE = [
+        { year: '1875年前后', text: '赤峰雅乐约在清光绪初年流入赤峰地区，由元宝山矿主、清末秀才等文人雅士传习演奏。' },
+        { year: '1936年', text: '李惠清以个人名义石印全套雅乐谱，使部分曲谱得以保存和流传。' },
+        { year: '1982年', text: '赤峰市委、市政府成立雅乐抢救小组，组织艺人回忆曲目、翻译工尺谱并恢复演奏。' },
+        { year: '1984年', text: '中央人民广播电台向台湾同胞和国内外听众专题介绍、播出赤峰雅乐。' },
+        { year: '2003年', text: '赤峰雅乐演奏团队正式组建，赤峰雅乐重新从资料库走向现场演奏。' },
+        { year: '2011年', text: '赤峰雅乐列入第二批自治区级非物质文化遗产代表性项目名录。' },
+        { year: '2018年', text: '张景瑞被评为内蒙古自治区级非遗项目赤峰雅乐传承人。' }
+    ];
+
+    const HERITAGE_LONG_ARTICLES = [
+            {
+                    "id": "zhang-jingrui-heritage-road",
+                    "tag": "传承人物长文",
+                    "title": "我的赤峰雅乐传承之路",
+                    "author": "张景瑞",
+                    "summary": "张景瑞以亲历者视角回顾赤峰雅乐从1982年抢救整理、进入青少年宫和校园，到组建演奏团队、编配总谱、申报非遗并走向现代舞台的全过程。",
+                    "body": "我的赤峰雅乐传承之路\n张景瑞\n雅乐是古代宫廷祭祀天地祖先和朝贺宴飨等大典所用的音乐。雅乐作为宫廷音乐，随清朝统治的衰落，宫廷音乐逐渐流入民间。雅乐流入赤峰地区的时间，据红山文史记载：大约在光绪初年（1875年前后），当时元宝山矿主和清末秀才等人组织雅乐会，研习演奏雅乐，开始在庙会、节日社庆活动中演奏。雅乐曲调中正平和，典雅纯正，百年来深受群众喜爱。后来由于经历多次战乱和受文革“破四旧”的影响，无人再敢整理和演奏赤峰雅乐，雅乐频于失传。\n1982年，原赤峰市委、市人民政府成立乐抢救小组，对赤峰雅乐进行抢救性的挖掘整理。红山区文化馆的音乐工作者组织当时健在的赤峰雅乐艺人，通过回忆、查找现存乐谱，挖掘出赤峰雅乐短曲24首，并把原雅乐的工尺谱译成简谱。组织赤峰雅乐艺人、文化馆的音乐教师和赤峰市乌兰牧骑的演奏人员对24首短曲进行演奏和录音。本人当时作为市乌兰牧骑乐器演奏员参加了此次演奏和录音，并有机会向赤峰雅乐艺人张海峰、刘百川等人学习演奏赤峰雅乐，对赤峰雅乐产生了浓厚的兴趣，从此走上了赤峰雅乐的传承之路。\n1985年，本人由赤峰市乌兰牧骑调入赤峰青少年宫从事校外艺术教育工作，这对赤峰雅乐在孩子们中间的传播传承提供了一方沃土。在多年的乐器教学中，我把赤峰雅乐的短曲编入器乐教材中，让孩子们在学习乐器演奏的初级阶段，就能接触到本地的非遗音乐，使雅乐影响力不断扩大。1991年，我将赤峰雅乐“雁阵”等短曲改编成四胡独奏“雁归塞北”，参加了国家文化部在广西柳州举办的“全国少年儿童少数民族乐器演奏评奖”，获得三等奖。乐曲曾发表于《内蒙古群文论坛》。1989年本人在赤峰青少年宫组建“红领巾乌兰牧骑小民乐队”，曾四次去北京、西安、杭州等地参加全国少年宫文艺汇演，演奏赤峰雅乐，受到了好评。1982年—2000年，赤峰雅乐的传播传承工作，只是在我力所能及的工作范围内，在少年宫学习音乐的学员当中进行。作为一名从事音乐教育的人，总感觉传播我们本地的非遗音乐应是我们的责任，应该尽一份力量。\n2001年，我调入红山区文化馆任馆长，红山区文化馆是赤峰雅乐的挖掘整理传承单位。在新的历史时期，如何做好赤峰雅乐的传承，使这一文化瑰宝得到大力的弘扬和发展，做了如下几个方面的工作：\n一、加强对赤峰雅乐的理论研究，对赤峰雅乐的流源、演奏风格、曲式结构、旋律进行等诸方面进行研究，力图对赤峰雅乐产生新的认识。我们曾三次聘请市内外音乐专家、作曲家对赤峰雅乐音乐特色等方面进行研讨，特别是赤峰雅乐在传承过程中和蒙古族音乐相融合的曲例进行深入的分析。大家一致认为：赤峰雅乐是蒙汉两个民族文化的结晶，是汉族文化和少数民族文化相互融合的产物，从而对赤峰雅乐有了一个全新的认识。我曾撰写论文《赤峰雅乐源流初探》，把赤峰雅乐的部分曲例和我们当地蒙古民歌、杠房音乐、佛乐以及承德清音等音乐进行分析比较，来论证赤峰雅乐和少数民族音乐相互融合的特点。该论文曾获得全国群众文化学会主办的2004年论文比赛的三等奖。\n二、培训演奏人员，建立赤峰雅乐演奏团队。\n（1）赤峰雅乐属于音乐类非遗项目，除了在媒体播放录音外，最主要的传播途径就是现场演奏来传达给观众，这就需要有一支演奏队伍，而这支队伍需要按现代民族乐团的编制组建，才能符合现代人民群众的欣赏水平。2003年，我们在红山区老年大学组建了赤峰雅乐演奏团，乐团吸收原专业文艺团体的退休人员和机关企业单位的具有演奏乐器基础的退休人员，组成了50人规模的演奏团体。由红山区老干部局和文化馆共同出资购买了乐器、服装。从此在红山大地上诞生了一支以演奏赤峰雅乐为主的，具有现代民族乐团的弓弦、弹拨、吹管、打击乐编制齐全的民乐团。该团成立20年来，常年坚持每周两次培训和排练，曾15次举办赤峰雅乐专场音乐会、参加社会文艺演出174场。该团在2012年被红山区人民政府挂牌为赤峰雅乐传承基地。\n（2）为了解决赤峰雅乐的传承后继有人的问题，从2006年起，我们先后在赤峰八中、赤峰回民实验小学、赤峰第十三小学组建了少年赤峰雅乐演奏团，让非遗音乐走进校园，让传统文化在孩子们中间传播传承更具有长远意义。十多年年来，我们在学校培训学员600多人次。赤峰回民实验小学已把赤峰雅乐授课列入“校本课”。2012年赤峰回民实验小学被红山区人民政府命名为赤峰雅乐传承基地。\n三、编配赤峰雅乐的总谱，为雅乐演奏提供一剧之本。建立了赤峰雅乐演奏团，有了演奏队伍，但乐团没有赤峰雅乐的演奏谱，传承演奏就无从谈起。当时的情况是：最开始挖掘的雅乐24首短曲，只是记录主旋律，乐团演奏雅乐短曲只能以齐奏的形式单一旋律演奏，演奏效果极差。1985年，内蒙古师范大学赵汝德先生写的赤峰雅乐套曲，在中央广播乐团演奏后，我们仅拿回了录音带，总谱早已不知去向。我们的资料库里只有雅乐24首短曲的主旋律和雅乐套曲的录音带。为了给乐团提供雅乐的演奏总谱，我利用半年时间，通过听雅乐的音响资料，重新记谱，完成了赤峰雅乐套曲的总谱编配工作，给演奏雅乐的乐队提供演奏范本。2022年，赤峰雅乐套曲的十首曲目手抄本总谱已印刷。\n四、坚持守正创新，在使雅乐的传承不走样的前提下，又有发展和创新。几千年来，雅乐的表现形式都是音乐、舞蹈、歌曲三位一体，而赤峰雅乐所传乐谱只有乐器演奏谱。为使赤峰雅乐的演奏更适合于现代听众的欣赏要求，我们把赤峰雅乐套曲的四首曲填词，以多声部合唱的形式融入乐队的演奏，极大增强了赤峰雅乐演奏的表现力，使听众更直观了解了雅乐所表现的思想内涵。我们还在雅乐的两首曲中加入舞蹈表演，丰富了雅乐的表现力，打破了雅乐只是乐器演奏单一形式，使观众耳目一新。\n五、为赤峰雅乐申报内蒙古自治区级非物质文化遗产项目提供资料。自2008年起，赤峰雅乐由赤峰市级文化遗产项目开始申报内蒙古自治区级非遗项目。为使这次“申遗”成功，我们“申遗”小组提供了赤峰雅乐套曲的十首曲目和乐谱，并提供了近20年来，赤峰雅乐的演出录音、录像、节目单、排练和教学的图片等资料。这些详实的材料，为赤峰雅乐的“申遗”起到了一定的作用。2011年，赤峰雅乐被列入内蒙古自治区非物质文化遗产名录。2018年，我本人被评为内蒙古自治区级非遗项目赤峰雅乐传承人。\n赤峰雅乐传承工作取得的成绩：\n（一）自2001年起，赤峰雅乐的传承有了自己的演奏队伍，而且这支演奏团队是老中青相结合的演奏团体，团队成员既有老一代专业艺术家，还有青年教师，更重要的是有一群中小学生，这就为赤峰雅乐的传承演奏增添了活力。古乐真正焕发出新声。\n（二）20多年来，赤峰雅乐演奏团队曾举办6场赤峰雅乐专题音乐会，特别是2018年举办的“月满中秋，雅乐古韵”音乐会由香港凤凰电视直播，参加人员达130人，取得了良好的演出效果。另外，赤峰雅乐演奏团自2010年起，曾五次参加赤峰市草原文化节的演出，四次在赤峰电视台录制播放赤峰雅乐，40次参加赤峰新年音乐会、社区文艺汇演、国庆音乐会、迎春音乐会，6次参加赤峰市红山区非遗文化节，并在每年6月1日儿童节进校园演奏赤峰雅乐，多次组织非遗音乐走进校园演唱会。红山晚报、赤峰日报、内蒙日报等多家媒体多次报道赤峰雅乐的传承工作。\n（三）回顾赤峰雅乐几十年的传承工作，最大的亮点有两个：一是我们建立了自己的演奏团队，把雅乐从资料库里解放出来，成为活生生的、可供人们欣赏的音乐；二是20年前，我们就把赤峰雅乐的传承工作重点放在学校，让孩子们传承经典，这对我们弘扬中华优秀传统文化意义重大。"
+            },
+            {
+                    "id": "li-fu-complete-yayue",
+                    "tag": "非遗文章",
+                    "title": "我国最完整的雅乐：赤峰雅乐",
+                    "author": "李富 搜集整理",
+                    "summary": "文章系统梳理赤峰雅乐的渊源、曲谱保存、四大乐章、乐器编制、广播传播、套曲发行，以及张海峰在抢救整理中的关键贡献。",
+                    "body": "我国最完整的雅乐：赤峰雅乐-文   李富-\n\n\n我国最完整的雅乐：赤峰雅乐\n\n李富 搜集整理\n\n赤峰雅乐渊源\n“雅乐”一词最早出现在《论语》中，它是与民间俗乐相对而言。“雅乐”即“正乐”，一般用于宗教、政治、礼仪等国家仪式中，体现王权和威严。封建王朝的统治者在取得王权后，都会依照惯例制作本朝“雅乐”来为国家礼制服务。所以，雅乐也是礼制的重要组成部分。雅乐，一般泛指宫廷祭祀活动和朝廷礼仪中所用的音乐，源于西周，至元代隋宫廷乐工离散而流于民间，演奏赤峰雅乐始于清光绪初年，最先传习雅乐者是赤峰元宝山矿矿主李林梓，后为晚清举人董成荣、秀才张朝清。\n\n“赤峰雅乐”挖掘整理、出版发行表彰大会，作者李富供图\n李惠清于1936年以个人名义，石印全套雅乐谱。他在为乐谱题写的序言中写道：“孔子圣人在齐闻韶尚三月不知肉味，乐之引人人自乐之也……余揣其私意，知今之乐犹古之乐也。是以集松州故友之佳曲，存先儒诹咨之好音，留为知音者袭而取也。”此书仅发一册，保存在医师刘伯川手中。50年代原赤峰市文化馆雅乐队曾挖掘、演奏过部分乐曲，并以“工尺字”译成简谱，惜在60年代后期散佚。“赤峰雅乐”开始在本地区流传，至今已有130余年。\n印制于康德三年的 “赤峰雅乐”全套工尺谱复印件，作者李富供图李惠清热衷于雅乐演奏，并组织了乐班。当时，每年农历五月十三日以及“盂兰盆会”等大规模庙会上都有雅乐演奏，影响盛极一时。赤峰地区的举人、秀才、文人雅士还成立了“雅乐会”。伪满政权统治时期，赤峰雅乐曾一度被日本侵略者改成伪满“国乐”，直到抗战胜利，所谓的“国乐会”才被解散。据孙孝良的《古乐新韵—近代赤峰雅乐探析》所载，1949年后，内蒙古自治区文化部门专门委派专家来赤峰搜集整理赤峰雅乐，共整理出13首乐谱。当时赤峰市文化馆尚有部分文艺工作者能演奏部分曲目，但在“文革”时期，因曲谱失传，再无人能演奏赤峰雅乐。1982年，红山区文化馆馆长张国清和音乐组组长李守臣邀请到82岁高龄的雅乐传承人张海峰，听他回忆了赤峰雅乐的曲目和曲谱，经过记录和整理，恢复了24支曲目并将之译成简谱，在张海峰和文化馆、乌兰牧骑音乐工作者的共同努力下，演奏出了新的赤峰雅乐。\n\n1983年《赤峰雅乐》在赤峰人民广播电台演奏录制实况，作者李富供图\n恢复后的赤峰雅乐由《大典》《四季》《雁旋》《龙腾》四个乐章组成。《大典》体现国家气度和权力威严，有《宫宴》《庆寿》《水龙吟》等乐段；《四季》是祭祀音乐，有《春来》《夏来》《秋来》《冬来》4个乐段，蕴含“以民为本”思想；《雁旋》以大雁来象征热恋故土、民族团结，乐段有《雁阵》《雁旋》《雁落平沙》；《龙腾》由《龙抬头》《龙腾》《龙尾》等乐段组成，以龙的腾跃来表现国家的繁荣昌盛。\n赤峰雅乐的曲调分为“小宫调”“正宫调”“尺子调”三大类。曲牌名多是根据乐思而制，有的沿用传统曲牌，如《水龙吟》。作为宫廷雅乐，赤峰雅乐的曲调多为帝王仪式音乐，如正宫调《龙头》《龙身》《龙尾》《水龙吟》；祭祀音乐《春来》《夏来》《秋来》《冬来》；宴庆活动的正宫调《庆寿》《正北宫》《雁落平沙》等，其音乐风格都适合表现怡然自得、四海升平的景象。因雅乐在赤峰流传时间长，在流传过程中逐渐与当地的蒙古族民歌、宗教音乐等形式相结合，逐渐形成了具备赤峰地区独特韵味的古乐。\n\n赤峰市专业团体在演奏赤峰雅乐，作者李富供图演奏赤峰雅乐的乐队人数需五六十人，演奏乐器有大鼓、怀鼓、云锣、苏笛、笙、双管儿、四弦、三弦、洞箫、胡琴、提琴，以及打击乐器星、铃铎、扑钗、云板。操弦者功夫出在拈、搬、揉、扣、推、扫以及速度和力度上，鼓板的作用相当于乐队的指挥，是乐队的灵魂。雅乐的传习者要有很高的文化素养、精神气质，才能切身体会到曲子的境界，从而在演奏中能与其他乐器融入一体。欣赏者则平心静气，心领神会，从而达到陶冶情操、净化心灵的目的。\n雅乐自古具有教化作用，是礼仪之邦的治国之本，它的传承表明了人们对“礼”和“雅”的认同。20世纪80年代，赤峰雅乐在中央人民广播电台播出引起强烈反响，其“中正平和，典雅纯正”的曲风被公认为是对中国雅乐的继承者，也是到目前为止我国最完整的雅乐。十一届三中全会后，为继续发扬民族艺术，赤峰市政协、文化局于1982年末联合成立“雅乐抢救小组”，并责成文化馆承担翻译曲谱、组织人员排练等项业务。此次挖掘、演奏得助于自幼酷爱音律、熟悉雅乐的张海峰老人，他以非凡的记忆力和娴熟的演奏技巧，口述“工尺字”，和年近古稀的徐俊及文化馆、乌兰牧骑部分青年音乐工作者一起切磋琢磨，反复排练。经一年多时间，形成最初的音响资料，并编印《赤峰雅乐》一书，共24支曲目：《庆寿》《小妹子》《北正宫》《中风韵》《尾繁续》《鹧鸪天》《龙头》《无僧佛》《飞蝴蝶》《水龙吟》《龙身》《龙尾》《鹧鸪地》《春来》《夏来》《秋来》《冬来》《来尾》《雁头》《雁阵》（雁序）《雁旋》《雁身》（雁行）《雁落平沙》《雁尾》。这些乐曲计分“尺字调”、“正宫调”、“小宫调”三大类。曲牌名是根据曲子所表达的乐思而作，有的则是沿用传统的词牌和曲牌，如《水龙吟》为高管统帅升帐时常用的曲牌。\n赤峰市老年之春艺术团在演奏《赤峰雅乐》，作者李富供图赤峰雅乐普以传统的“工尺字”作标示，爱好此乐者皆凭面授口传，教、学双方需要以自身的文化素养、生活阅历和精神气质，体会每支曲子的意境，揣摩其内涵，掌握其节奏，其抑扬顿挫、轻柔徐疾之风韵便油然而生。欣赏者则需心平气静，细心体会，才能感受到“雅乐”的中正、平和、宽舒、典雅的独特艺术风格。演奏时所用乐器有笙、管、笛、萧、三弦、提琴（亦称胡琴，其形似板胡）、云锣、大鼓、怀鼓、星、铃、铎、扑、钗、豆板等民族管、弦、打击乐。一个乐队十五六人左右。\n经初步调整的赤峰雅乐，于1984年9月10日由中央人民广播电台台播部向台湾同胞专题介绍五首乐曲。同年12月13日，中央人民广播电台文艺部向国内外听众介绍和播出，并由高云华编辑解说词。1984年至1986年，中国广播报、中国新闻社香港分社、内蒙古电视台等新闻单位均对“赤峰雅乐”连续进行报道和专题介绍。1986年10月，人民日版海外版、新华通讯社分别用中英文介绍“赤峰雅乐”的挖掘、整理情况。同年11月，中央电视台通过新闻联播节目再次播映赤峰雅乐。由于专家与地方有关部门的重视及从事挖掘整理此项古乐的工作人员共同努力，使赤峰雅乐从塞外小城传播海峡两岸，走向世界。\n\n老艺人们与文化馆、乌兰牧骑的同志们一同演奏“赤峰雅乐”，作者李富供图2003年，赤峰雅乐队正式成立。2004年赤峰雅乐队演奏的《庆寿》《水龙吟》《北正宫》被中央电视台国际频道《走遍中国》栏目，以《古韵新风》为题，录制成专题节目。目前，雅乐队已有30多人的庞大阵容。\n赤峰雅乐，2011年4月列入第二批市级非物质文化遗产代表性项目名录；2011年8月列入第二批自治区级非物质文化遗产代表性项目名录。\n\n赤峰最早的《赤峰雅乐》版本《赤峰雅乐》最早的版本是保存于韩诚勇家的《十番·翕纯缴绎谱》。按：“翕纯敏绎”四字，是对这组乐曲的批语，此系孔子说的“乐其可知也：始作，翕如也；从之，纯如也，皦如也，绎如也，以成。”。这句古语的简化意为：这是一组旋律和谐、曲调精美、音响清晰，听起来有连绵不断之感的十番乐曲。此乃最早对赤峰雅乐的评语。\n\n赤峰最早的赤峰雅乐盒带\n为使赤峰雅乐以其完整的艺术形象跻身于中国民族艺术之林，红山区邀请内蒙古师范学院音乐系副教授赵汝德将《赤峰雅乐》改编成《赤峰雅乐套曲》。改编后的套曲既保持古朴典雅、雍容华贵的宫廷音乐气度和魅力，又加强其节奏鲜明的舞蹈性。\n1988年12月发行的“赤峰雅乐”套曲盒式带发行海内外，作者李富供图“套曲”将原雅乐24首乐曲收用23首，然后根据曲牌原来的命名和乐曲基本格调，合并为13首，计分四段；第一段《大典》，通过开基大典的朝贺和宴轻仪典，体现国家的气度和权力的威仪；第二段《四季》，通过对春播、夏锄、秋收、冬藏农事活动的描绘与渲染，讴歌劳动人民热爱生活、建设生活的热情；第三段《雁旋》，借合群的秉性及热爱故土的恋情，象征祖国大家庭各民族和睦相处、情迷团结的情景；第四段《龙腾》，意在以民间盛会龙舞的热烈气氛，表现祖国繁荣昌盛、万民欢腾的景象，用龙的形象象征中华民族的凝聚力和恢宏的气概。\n中央人民广播电台文艺部于1987年7月向全国介绍播放“套曲”，并做为向全国各广播电台交换的民族节目之一。1998年12月中国民族音乐资料编辑部责成广州白天鹅音像艺术有限公司将“套曲”印制成盒式带发行国内外。“套曲”已收入中国民族音乐资料东南亚版，并纳入中国民族音乐（资料）精选录音带。“套曲”已在法国国际图书博览会上展出。\n“套曲”是目前国内最完整的“雅乐”，具有重要的艺术价值，是祖国民族音乐的瑰宝。\n赤峰雅乐最重要的演奏者和对赤峰雅乐抢救工作贡献最大者张海峰\n\n赤峰雅乐最重要的演奏者和对赤峰雅乐抢救工作贡献最大者张海峰先生。作者李富供图张海峰(1903——1992)，赤峰市（今红山区）人，4岁丧母，因家贫，11岁时，父亲把他舍身赤峰五道街洪福寺（一名财神庙)当和尚，为佛门性瑞弟子，师父给他起个法号叫海峰。性瑞和尚为蒙古族，既不通音律，也不诵读经卷，唯嗜吸鸦片，因而对小海峰，不闻不问，听之任之。由于当时赤峰街里各寺庙，没有一个和尚会使用乐器，当张海峰12岁时，便投奔喀喇沁旗楼子店乡二道营子关帝庙，师从自丰、自申两和尚，学习吹笙，一共去了三个冬季，学会佛曲和民间乐曲不下百余首，这两位和尚便是他的启蒙老师。\n有一年，张海峰去喀喇沁旗洞山佛寺闲住，又从广训、广博两和尚学习佛曲，在那里，他们又教他一首由赤峰街里传去的十番乐曲——《水龙吟》（后来称为雅乐）。当他得知这支乐曲是由洞山佛寺用重金聘请赤峰街的李惠清先生教习的时候，便返回赤峰，拜私垫先生李让泉秀才为师，学会全部十番乐曲。这是他的第二位音乐教习。\n内蒙古民族器乐专家采访张海峰先生，作者李富供图\n有一次，张海峰云游到赤峰初头朗乡的法轮寺，正好那里来了一位去多伦探亲、途中在此停留的山东曲阜乐班吹笙的孙某，于是从他学习笙的吹奏法，承蒙指点，得其神髓，从此技艺大进，故海峰的吹笙，较他人别有一种韵味。张海峰出家之前，没念过一天书，他的文化是以后学的，起初跟福音堂牧师教汉语的陈凤和学习，以后又跟私塾先生张景康和张子元学习。当他29岁至31岁时，又去赤峰二中街华兴池东侧的乡村师范念了两年书。伪满时期，赤峰县教育局设在洪福寺院内，因其是那里的和尚，常与局长杜泮清有交往，于1935年，经杜的推荐，便在教育局学务股当了一名见习科员，于是他告别了青灯黄卷的清贫生活而还俗。每月工资15元。以后他又考取了正式科员，月薪增至30元。1938年改任教职，初在洪福寺小学教书，不久，被保送到承德师范培训班学习半年。其间，得到赤峰东水地倪恩衔和西大沟村的姚奎两同学的帮助，顺利完成初师学业。此后他又调入赤峰建昌营、洪福寺等小学任校长多年，后来又到承德行政干校学习半年，毕业后，升任赤峰县九区教育助理，1951年改派永合营子等校任小学教师。1958年以病为由，有关部门强迫其退职，发给一笔退职金了事，从此，他便成了无业游民，直到逝世强迫他退职的错误也未得到改正。十年浩劫，这位出身贫苦而又清白的老人，亦未幸免于难，全家被赶到赤峰县哈达和硕村，一住多年。后来才举家迁回赤峰。\n张海峰先生与李宝祥等老师为专家们现场演奏雅乐，作者李富供图1983年，红山区政协成立了国乐抢救小组，整理赤峰雅乐，方请老先生出头，仅靠工尺谱是不行的，还得张先生哼着曲子，由红山区文化馆员李守臣记录，整理成简谱。赤峰雅乐的译谱工作，在张老的帮助下，得以能顺利完成。演奏时，张老不但领奏，还反复指点，尽量恢复其原有韵味。因此，没有张海峰的鼎力协助，便没有今天的雅乐，洵非虚语。雅乐录制成功并播放以后，在国内外引起强烈反响。\n1984年，他又把珍藏多年的21首佛曲谱献给红山区政协，在他的指导下，完成了录制工作，并在中央人民广播电台播放。由于这两大贡献，赤峰市红山区政府曾发给他一笔奖金。\n赤峰雅乐，虽已录制成功，但在张先生看来，并非尽善尽美，他说：“雅乐是由十种主要器乐组成的乐队演奏的，但每种器乐都有每种的味，笛子有笛子的味，箫有箫的味，每种器乐达不到各自应有的味时，合起来也不行，不中听。只有每位演奏者都达到一定的艺术造诣，合奏起来，才算成功。这种临时‘抱佛脚'的做法，是一种缺欠。”\n\n本文查阅并参考了《赤峰之最》《赤峰非物质文化遗产项目名录》《赤峰市志》《赤峰市红山区文化志》等，在此表示感谢。\n\n\n\n作者简介\n犁夫，本名李富，文学学士学位，作家、记者、评论家、剧作家、词作家、编导，中国寓言文学研究会特邀评论家，内蒙古民族文化艺术研究院研究员，内蒙古作家协会会员。\n著有《我阅读草原》《父亲》《中国首部旱作农业诗典》《辽都往事》《大辽契丹的历史故事和民间传说》《瓜川是故乡》等多部作品。\n犁夫先后在新华社、中新社、《人民日报》《光明日报》《十月》《散文》《草原》《青年文摘》《微型小说选刊》《小说月报》《天池》《小小说选刊》香港《大公报》《文汇报》台湾《台湾好报》美国《侨报》等海内外800多家媒体上发表作品，500多万字。   \n2020年，犁夫被评为“中国闪小说十大新锐作家”，获得“蒙古马”全球征文一等奖，获得中国西部最佳美文奖。\n2021年，犁夫的文艺评论被评为中国闪小说十大热点事件，摄影作品获得中国航展摄影大赛奖，获得“大美松山”全国摄影奖，散文诗获得建党百年征文一等奖。\n2022年，犁夫获得深圳文艺评论奖。"
+            },
+            {
+                    "id": "yayue-heritage-overview",
+                    "tag": "赤峰雅乐概览",
+                    "title": "赤峰雅乐传承与发展",
+                    "author": "文化研究室",
+                    "summary": "从历史渊源、音乐特点和传承保护三个角度，概述赤峰雅乐作为非遗项目的基本面貌。",
+                    "body": "赤峰雅乐传承与发展\n赤峰雅乐是内蒙古自治区非物质文化遗产，具有深厚的历史文化底蕴。其音乐形式独特，旋律优美，展现了草原文化的独特魅力。\n历史渊源\n赤峰雅乐的历史可以追溯到元代，经过数百年的发展和传承，形成了独具特色的音乐体系。其中包含了丰富的器乐演奏、声乐演唱以及仪式音乐等多种形式。\n音乐特点\n赤峰雅乐的音乐特点主要表现在以下几个方面：\n1. 曲调优美，富有草原特色\n2. 乐器搭配独特，以传统乐器为主\n3. 演奏形式多样，包括独奏、重奏和合奏\n4. 具有鲜明的仪式性和庄重感\n传承发展\n为了更好地传承和发展赤峰雅乐，当地采取了多项措施：\n1. 建立专门的传承基地\n2. 开展定期的培训活动\n3. 举办展演和交流活动\n4. 进行系统的音乐记录和整理"
+            },
+            {
+                    "id": "heritage-101",
+                    "tag": "拓展非遗文章",
+                    "title": "赤峰民歌的历史传承与现代发展",
+                    "author": "张学者",
+                    "summary": "本文探讨赤峰民歌的历史演变、艺术特色及其在当代社会的传承与创新。",
+                    "body": "赤峰民歌是中国北方草原音乐文化的重要组成部分，它融合了蒙古族、汉族等多民族的音乐元素，形成了独具特色的音乐风格。本文将从历史渊源、艺术特色以及现代传承三个方面，对赤峰民歌进行深入探讨。\n\n一、历史渊源\n\n赤峰民歌的历史可以追溯到元代，当时蒙古族游牧文化与中原农耕文化的交融，为赤峰民歌的形成奠定了基础。明清时期，随着移民的增加，汉族音乐元素逐渐融入其中，形成了独特的音乐风格。\n\n20世纪初，赤峰民歌开始被系统收集和研究。许多音乐学者深入草原，记录并整理了大量的民歌资料，为赤峰民歌的传承和发展做出了重要贡献。\n\n二、艺术特色\n\n赤峰民歌的艺术特色主要体现在以下几个方面：\n\n1. 音调特色：赤峰民歌多采用五声音阶，旋律起伏较大，节奏自由，表现力丰富。\n\n2. 演唱方式：有独唱、对唱、轮唱等多种形式，常常在野外劳作或节日庆典中自然演唱。\n\n3. 题材内容：内容丰富多样，包括反映生产生活、歌颂爱情友谊、赞美自然风光等多种题材。\n\n三、现代传承与发展\n\n近年来，随着社会的发展和人们生活方式的变化，赤峰民歌的传承面临一定挑战。但同时，也出现了许多积极的变化：\n\n1. 教育传承：将民歌教育引入学校课程，培养年轻一代对传统音乐的兴趣。\n\n2. 艺术创新：许多音乐家对传统民歌进行创新改编，使其更符合现代审美。\n\n3. 数字保护：利用现代技术对民歌进行数字化记录和保存，建立数据库。\n\n4. 文化活动：定期举办民歌比赛、音乐节等活动，提高民歌的社会影响力。\n\n结语\n\n赤峰民歌作为中国草原音乐文化的瑰宝，承载着深厚的历史文化内涵。在新时代，我们应当在保护传统的基础上进行创新发展，使这一宝贵的音乐遗产在现代社会焕发新的生机。"
+            },
+            {
+                    "id": "heritage-102",
+                    "tag": "拓展非遗文章",
+                    "title": "蒙古族长调民歌的艺术特色",
+                    "author": "李研究员",
+                    "summary": "长调民歌是蒙古族传统音乐的瑰宝，本文深入分析其音乐结构与表现技巧。",
+                    "body": "蒙古族长调民歌是蒙古族传统音乐中最具代表性的音乐形式之一，被誉为\"草原上的艺术明珠\"。本文将对蒙古族长调民歌的艺术特色进行深入分析。\n\n一、长调民歌的基本特征\n\n蒙古族长调民歌，顾名思义，其最显著的特点就是曲调悠长。一般来说，长调民歌具有以下基本特征：\n\n1. 音域宽广：一般可达两个八度以上，有些甚至超过三个八度。\n\n2. 节奏自由：没有固定的拍子和节奏，演唱者可根据情感需要自由伸缩。\n\n3. 装饰音丰富：大量运用颤音、滑音等装饰技巧，增强表现力。\n\n4. 结构完整：一般包括前奏、主歌和尾声三个部分，形成完整的音乐结构。\n\n二、演唱技巧与表现力\n\n蒙古族长调民歌的演唱技巧极为复杂，需要长期的专业训练。主要技巧包括：\n\n1. 气息运用：需要强大的肺活量和气息控制能力，能够在一口气中完成长句的演唱。\n\n2. 喉音技巧：独特的喉音发声方法，能够产生特殊的声音共鸣效果。\n\n3. 情感表达：通过音色变化、力度控制等手段，表达丰富的情感内涵。\n\n三、文化内涵与价值\n\n蒙古族长调民歌不仅是一种音乐形式，更是蒙古族文化的重要载体。它蕴含的文化内涵主要表现在：\n\n1. 草原情怀：反映了蒙古族人民对广阔草原的热爱和依恋。\n\n2. 历史记忆：许多长调民歌记录了重要的历史事件和人物。\n\n3. 哲学思考：表达了对生命、自然和宇宙的思考。\n\n四、代表性曲目分析\n\n《四季》：这是一首描绘蒙古草原四季变化的经典长调民歌。曲调以宽广的音域和自由的节奏，生动地描绘了春夏秋冬的景色变化和牧民生活的场景。\n\n《思恋》：这首情歌以其深情的旋律和丰富的情感表达著称。演唱者通过细腻的声音控制和装饰音的运用，表达了深沉的思念之情。\n\n结语\n\n蒙古族长调民歌以其独特的艺术魅力，不仅在中国，而且在世界音乐舞台上都占有重要地位。了解和欣赏这一音乐形式，有助于我们更全面地理解蒙古族文化的丰富内涵。在现代社会，我们应当重视对这一非物质文化遗产的保护和传承，使其继续绽放光彩。"
+            },
+            {
+                    "id": "heritage-201",
+                    "tag": "拓展非遗文章",
+                    "title": "马头琴的制作工艺与演奏技法",
+                    "author": "王工艺师",
+                    "summary": "马头琴是蒙古族传统乐器，本文介绍其制作工艺、演奏技法及文化内涵。",
+                    "body": "马头琴是蒙古族最具代表性的传统乐器，以其独特的形状和深沉悠扬的音色著称。本文将详细介绍马头琴的制作工艺、演奏技法及其文化内涵。\n\n一、马头琴的历史起源\n\n马头琴的历史可以追溯到13世纪，相传是由成吉思汗时期的一位勇士发明的。由于琴头雕刻成马头形状，因此得名\"马头琴\"。在蒙古族的传统中，马头琴被视为马的化身，象征着蒙古族人与马的深厚感情。\n\n二、制作工艺\n\n传统马头琴的制作是一门精湛的工艺，主要包括以下步骤：\n\n1. 选材：琴身通常选用松木或杨木等材质，琴杆选用硬木，琴弦早期使用马尾，现代多用金属弦。\n\n2. 制作琴身：将木材挖空成六角形或梯形音箱，前面蒙以蛇皮或薄羊皮作为共鸣面。\n\n3. 雕刻琴头：在琴杆顶端精心雕刻马头，这是马头琴最具标志性的部分，需要技艺精湛的工匠精心制作。\n\n4. 安装琴弦和琴马：琴马是一个小支架，支撑琴弦并传递振动到共鸣箱。\n\n5. 调音与试音：完成后进行精细调整，确保音色纯正。\n\n三、演奏技法\n\n马头琴的演奏技法独特而丰富，主要包括：\n\n1. 基本姿势：演奏者通常坐着演奏，将琴身支在左腿上，右手持弓，左手按弦。\n\n2. 弓法：包括长弓、短弓、跳弓等多种技法，通过不同的弓法可以表现不同的音乐效果。\n\n3. 指法：左手指法包括按弦、滑音、揉弦等，能够表现丰富的音乐情感。\n\n4. 特殊技巧：如模仿马嘶、风声、鸟鸣等自然声音的特殊演奏技巧，是马头琴音乐的重要表现手段。\n\n四、文化内涵\n\n马头琴不仅是一种乐器，更是蒙古族文化的重要载体：\n\n1. 草原文化的象征：马头琴的音色能够生动地表现草原的辽阔和蒙古族人的豪放性格。\n\n2. 精神寄托：在传统蒙古族社会中，马头琴常被用来抒发情感，传递思念。\n\n3. 仪式功能：在重要的宗教仪式和民间庆典中，马头琴常扮演重要角色。\n\n五、当代传承与发展\n\n近年来，马头琴艺术得到了更好的传承和发展：\n\n1. 教育传承：在音乐学院和民族学校设立专门的马头琴教学课程。\n\n2. 创新发展：将马头琴与现代音乐相结合，创作出具有时代特色的新作品。\n\n3. 国际交流：通过国际音乐节和文化交流活动，将马头琴音乐推向世界舞台。\n\n结语\n\n马头琴作为蒙古族传统文化的重要组成部分，承载着丰富的历史和文化内涵。了解马头琴的制作工艺和演奏技法，有助于我们更深入地理解蒙古族文化的独特魅力。在现代社会，我们应当重视对这一非物质文化遗产的保护和传承，使其在新时代继续发扬光大。"
+            },
+            {
+                    "id": "heritage-301",
+                    "tag": "拓展非遗文章",
+                    "title": "赤峰地区传统戏曲的历史与发展",
+                    "author": "赵导演",
+                    "summary": "本文梳理赤峰地区传统戏曲的历史沿革、艺术特色及其在当代的传承状况。",
+                    "body": "赤峰地区的传统戏曲是中国北方地区戏曲文化的重要组成部分，融合了蒙古族、汉族等多民族的艺术元素，形成了独具特色的地方戏曲风格。本文将对赤峰地区传统戏曲的历史沿革、艺术特色及其在当代的传承状况进行系统梳理。\n\n一、历史沿革\n\n赤峰地区的传统戏曲可以追溯到元代，当时随着大量汉族人口的迁入，中原地区的戏曲艺术也传入了赤峰。到了明清时期，由于商业的发展和文化的交流，赤峰地区形成了以二人台、蒙古剧等为代表的地方戏曲体系。\n\n近代以来，随着社会变革和文化演进，赤峰地区的传统戏曲也经历了一系列的变化和发展，吸收了现代戏剧的表现手法，内容上也更加贴近现代生活。\n\n二、艺术特色\n\n赤峰地区传统戏曲的艺术特色主要表现在以下几个方面：\n\n1. 音乐特点：融合了蒙古族长调和汉族民歌的元素，形成独特的板式和曲调。音乐气势恢宏，同时又不失细腻，能够准确表达人物情感。\n\n2. 表演风格：表演风格豪放中见细腻，动作夸张而不失真实，善于通过程式化的动作表达内心情感。\n\n3. 剧目题材：剧目题材广泛，包括历史故事、民间传说、爱情故事以及现实生活等多种题材，反映了各个时期的社会生活和民众心理。\n\n4. 舞台美术：舞台设计简洁明快，服装色彩鲜艳，妆容夸张有特点，整体视觉效果鲜明生动。\n\n三、代表剧种分析\n\n1. 二人台\n\n二人台是赤峰地区最具代表性的地方戏曲之一，起源于清代。它以生、旦两个角色为主，表演形式灵活多变，可以是独角戏，也可以是多人合演。音乐采用板胡伴奏，唱腔高亢激昂，表演夸张生动，深受当地群众喜爱。\n\n2. 蒙古剧\n\n蒙古剧是在蒙古族传统说唱艺术基础上发展而来的综合性舞台艺术，它融合了蒙古族民歌、舞蹈和说唱艺术的元素。蒙古剧的表演强调集体舞蹈和合唱，场面宏大，气势磅礴，具有浓郁的草原特色。\n\n四、当代传承状况\n\n随着社会的发展和人们生活方式的变化，赤峰地区传统戏曲的传承面临一定的挑战。但同时，也出现了许多积极的变化：\n\n1. 保护政策：国家和地方政府出台了一系列政策，将传统戏曲列入非物质文化遗产保护名录，提供专项资金支持其传承与发展。\n\n2. 教育传承：在专业院校和民间艺术团体中设立传统戏曲专业，培养新一代戏曲人才。\n\n3. 创新发展：在保持传统特色的基础上，积极创新表现形式和内容题材，使传统戏曲更贴近当代观众的审美需求。\n\n4. 媒体传播：利用电视、网络等现代媒体手段，扩大传统戏曲的传播范围和影响力。\n\n五、面临的挑战与发展前景\n\n目前，赤峰地区传统戏曲面临的主要挑战包括：观众老龄化、年轻人兴趣减少、专业人才匮乏等。但同时，随着文化自信的增强和非物质文化遗产保护意识的提高，传统戏曲也迎来了新的发展机遇。\n\n未来，赤峰地区传统戏曲的发展前景主要在于：一方面要坚持原汁原味的传统艺术表演，另一方面要适应时代发展，进行适当的创新和改革，使传统戏曲在新时代焕发新的活力。\n\n结语\n\n赤峰地区的传统戏曲凝聚了当地人民的智慧和情感，是宝贵的文化遗产。在新时代，我们应当更加重视对传统戏曲的保护和传承，使其成为连接历史与未来的文化纽带，为构建中华民族共同体意识和促进民族团结作出贡献。"
+            }
+    ];
+
+    const YAYUE_INSTRUMENT_ARCHIVE = [
+        { name: '大鼓', family: '打击乐器', text: '音色浑厚有力，在赤峰雅乐中承担节奏骨架与仪式气势的塑造。当前游戏里的大军鼓可以理解为它的现代化节奏角色。' },
+        { name: '怀鼓', family: '打击乐器', text: '体积较小，便于携带，音色清脆，适合民间小型演出和节庆场景。' },
+        { name: '云锣', family: '打击乐器', text: '由多面小锣组成，能够形成明亮的音阶效果，在合奏中带来清晰的金属色彩。' },
+        { name: '胡琴', family: '弦乐器', text: '传统拉弦乐器，音色连绵、富于表情，适合承担旋律线和情绪表达。' },
+        { name: '三弦', family: '弦乐器', text: '弹拨乐器，音色清脆明亮，常见于民间音乐和戏曲伴奏。' },
+        { name: '笙', family: '吹奏乐器', text: '簧管乐器，可以吹奏和声，是中国传统合奏中非常重要的吹管音色。' },
+        { name: '素笛', family: '吹奏乐器', text: '竹制吹奏乐器，音色清亮，常用于表现明快、开阔的旋律。' },
+        { name: '星、铃、铎、扑钗、云板', family: '打击声部', text: '这些打击乐器共同构成礼仪音乐中的节奏层次和仪式感，是雅乐“中正平和”气质的重要来源。' },
+        { name: '现代混音声部', family: '网页改编', text: '当前游戏里的贝斯、电子琴、笛子是为了让传统素材进入现代互动混音场景，属于再创作声部。' }
+    ];
+
+    function openScoreOverlay() {
+        document.getElementById('scoreOverlay').classList.add('open');
+        setArchiveTab('scores');
+        document.getElementById('scoreSearch').value = '';
+        currentFilter = '全部';
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === '全部'));
+        renderScoreList();
+    }
+
+    function closeScoreOverlay() {
+        document.getElementById('scoreOverlay').classList.remove('open');
+    }
+
+    function setArchiveTab(tab) {
+        currentArchiveTab = tab;
+        document.querySelectorAll('.archive-tab').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.archiveTab === tab);
+        });
+        document.querySelectorAll('.archive-page').forEach(page => page.classList.remove('active'));
+        const target = document.getElementById(`archive${tab.charAt(0).toUpperCase()}${tab.slice(1)}`);
+        if (target) target.classList.add('active');
+        if (tab === 'scores') renderScoreList();
+        if (tab === 'story') renderStoryArchive();
+        if (tab === 'instruments') renderInstrumentArchive();
+    }
+
+    function setFilter(btn) {
+        currentFilter = btn.dataset.cat;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderScoreList();
+    }
+
+    function renderScoreList() {
+        if (!document.getElementById('scoreList')) return;
+        const kw = document.getElementById('scoreSearch').value.trim().toLowerCase();
+        let list = MUSIC_DATA.filter(m => {
+            const matchCat = currentFilter === '全部' || m.cat === currentFilter;
+            const matchKw = !kw || m.title.includes(kw) || m.category.includes(kw) || m.instrument.includes(kw);
+            return matchCat && matchKw;
+        });
+        document.getElementById('scoreCount').textContent = `共 ${list.length} 首曲目`;
+        document.getElementById('scoreList').innerHTML = list.map(m => `
+            <div class="music-card" onclick="openScoreViewer('${m.id}')">
+                <img class="music-card-cover" src="${m.cover}" onerror="this.style.background='#f7f9fc';this.style.border='1px solid #dbe3ef'" alt="${m.title}">
+                <div class="music-card-info">
+                    <div class="music-card-title">${m.title}</div>
+                    <div class="music-card-meta">
+                        <span class="tag">${m.cat}</span>
+                        <span>${m.category}</span>
+                        <span>乐器：${m.instrument}</span>
+                    </div>
+                </div>
+                <span class="music-card-arrow">›</span>
+            </div>
+        `).join('');
+    }
+
+    function renderStoryArchive() {
+        const root = document.getElementById('archiveStory');
+        if (!root || root.dataset.rendered === 'true') return;
+        root.innerHTML = `
+            <div class="heritage-feature">
+                <section class="archive-card">
+                    <h3>赤峰雅乐是什么</h3>
+                    <p>赤峰雅乐源于宫廷祭祀、朝贺、宴飨等礼仪音乐，后随宫廷乐工离散而流入民间，并在赤峰地区长期传习。它的曲风常被概括为“中正平和，典雅纯正”。</p>
+                </section>
+                <section class="archive-card">
+                    <h3>四大乐章</h3>
+                    <p>整理后的赤峰雅乐由《大典》《四季》《雁旋》《龙腾》四个乐章组成，分别承载礼仪气度、节令农事、故土团结和龙腾欢庆等意象。</p>
+                </section>
+            </div>
+            <section class="archive-card archive-wide">
+                <h3>传承时间线</h3>
+                <div class="timeline">
+                    ${YAYUE_TIMELINE.map(item => `
+                        <div class="timeline-item">
+                            <div class="timeline-year">${item.year}</div>
+                            <div class="timeline-text">${item.text}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </section>
+            <div class="archive-section-title">
+                <h3>传承人物</h3>
+                <span>口述、整理、教学与舞台传承</span>
+            </div>
+            <div class="heritage-person-grid">
+                <article class="heritage-person-card" data-mark="海">
+                    <h3>张海峰</h3>
+                    <p>张海峰（1903—1992）是赤峰雅乐抢救整理中的关键传承者。他凭借记忆和演奏经验口述工尺字，协助文化馆工作人员整理成简谱，并在录制排练中反复指点乐曲风韵。</p>
+                    <div class="heritage-tags"><span>工尺谱口述</span><span>抢救整理</span><span>雅乐领奏</span></div>
+                </article>
+                <article class="heritage-person-card" data-mark="景">
+                    <h3>张景瑞</h3>
+                    <p>张景瑞长期参与赤峰雅乐的传承、研究、编配和教学工作，推动演奏团队建设、校园传承和现代舞台演出，让雅乐从资料库重新回到现场演奏。</p>
+                    <div class="heritage-tags"><span>自治区级传承人</span><span>团队建设</span><span>校园传承</span></div>
+                </article>
+            </div>
+            <div class="archive-section-title">
+                <h3>非遗文章</h3>
+                <span>完整长文，按需展开阅读</span>
+            </div>
+            <div class="heritage-article-list">
+                ${HERITAGE_LONG_ARTICLES.map(article => `
+                    <article class="heritage-article-card">
+                        <div class="heritage-article-head">
+                            <div class="heritage-article-meta"><span>${article.tag}</span><span>${article.author}</span></div>
+                            <h3>${article.title}</h3>
+                            <p class="heritage-article-summary">${article.summary}</p>
+                        </div>
+                        <details>
+                            <summary>展开全文</summary>
+                            <div class="heritage-article-body">${formatHeritageArticle(article.body)}</div>
+                        </details>
+                    </article>
+                `).join('')}
+            </div>
+        `;
+        root.dataset.rendered = 'true';
+    }
+
+    function escapeHtml(text) {
+        return String(text).replace(/[&<>"]/g, ch => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;'
+        }[ch]));
+    }
+
+    function isArticleHeading(line) {
+        if (line.length > 24) return false;
+        if (/[。！？；，、]$/.test(line)) return false;
+        return /^(我的赤峰雅乐传承之路|我国最完整的雅乐|赤峰雅乐渊源|作者简介|赤峰雅乐传承工作取得的成绩|[一二三四五六七八九十]、|（[一二三四五六七八九十]+）)/.test(line);
+    }
+
+    function formatHeritageArticle(text) {
+        return String(text)
+            .split(/\n+/)
+            .map(rawLine => rawLine.trim())
+            .filter(Boolean)
+            .map(line => {
+                const className = isArticleHeading(line) ? ' class="article-heading"' : '';
+                return `<p${className}>${escapeHtml(line)}</p>`;
+            })
+            .join('');
+    }
+
+    function renderInstrumentArchive() {
+        const root = document.getElementById('archiveInstruments');
+        if (!root || root.dataset.rendered === 'true') return;
+        root.innerHTML = `
+            <div class="archive-grid">
+                <section class="archive-card archive-wide">
+                    <h3>乐器志的定位</h3>
+                    <p>这里不是完整百科，而是把传统乐器资料整理成与当前混音游戏相关的“声部解释”。后续每新增一个游戏乐器，都可以在这里补充它与赤峰雅乐传统乐队的关系。</p>
+                </section>
+            </div>
+            <div class="instrument-archive-grid">
+                ${YAYUE_INSTRUMENT_ARCHIVE.map(item => `
+                    <article class="instrument-archive-card">
+                        <span class="family">${item.family}</span>
+                        <h3>${item.name}</h3>
+                        <p>${item.text}</p>
+                    </article>
+                `).join('')}
+            </div>
+        `;
+        root.dataset.rendered = 'true';
+    }
+
+    function openScoreViewer(id) {
+        const m = MUSIC_DATA.find(x => x.id === id);
+        if (!m) return;
+        document.getElementById('viewerTitle').textContent = m.title;
+        document.getElementById('viewerDesc').textContent = m.description;
+        const content = document.getElementById('viewerScoreContent');
+        if (m.scores && m.scores.length) {
+            if (m.layout === 'tabs') {
+                const tabs = m.scores;
+                content.innerHTML = `
+                    <div style="display:flex;gap:8px;margin-bottom:16px;">
+                        ${tabs.map((t, i) => `
+                            <button onclick="switchScoreTab(this, 'score-tab-${i}')"
+                                style="padding:6px 18px;border-radius:16px;border:1px solid ${i===0?'#d4af37':'#d4dbe6'};
+                                background:${i===0?'#fff7e8':'#f7f9fc'};color:${i===0?'#8b6b18':'#667085'};
+                                cursor:pointer;font-size:13px;font-family:'Microsoft YaHei',sans-serif;transition:all 0.2s;">
+                                ${t.label}
+                            </button>
+                        `).join('')}
+                    </div>
+                    ${tabs.map((t, i) => `
+                        <div id="score-tab-${i}" style="display:${i===0?'block':'none'}">
+                            <img class="viewer-score-img" src="${t.url}" alt="${t.label}"
+                                onerror="this.outerHTML='<div style=\'color:#8a94a7;text-align:center;padding:20px\'>${t.label}暂无法加载</div>'">
+                        </div>
+                    `).join('')}
+                `;
+            } else {
+                content.innerHTML = m.scores.map((s, i) => {
+                    const url = typeof s === 'string' ? s : s.url;
+                    const label = typeof s === 'string' ? `第${i+1}页` : s.label;
+                    return `<img class="viewer-score-img" src="${url}" alt="${label}" onerror="this.outerHTML='<div style=\'color:#8a94a7;text-align:center;padding:20px\'>${label}暂无法加载</div>'">`;
+                }).join('');
+            }
+        } else {
+            content.innerHTML = '<div class="viewer-no-score">暂无曲谱资源</div>';
+        }
+        document.getElementById('scoreViewer').classList.add('open');
+    }
+
+    function closeScoreViewer() {
+        document.getElementById('scoreViewer').classList.remove('open');
+    }
+
+    function switchScoreTab(btn, tabId) {
+        // 切换按钮样式
+        const btns = btn.parentElement.querySelectorAll('button');
+        btns.forEach(b => {
+            b.style.borderColor = '#d4dbe6';
+            b.style.background = '#f7f9fc';
+            b.style.color = '#667085';
+        });
+        btn.style.borderColor = '#d4af37';
+        btn.style.background = '#fff7e8';
+        btn.style.color = '#8b6b18';
+        // 切换内容
+        const allTabs = btn.closest('div').nextElementSibling;
+        let el = allTabs;
+        while (el) {
+            if (el.id && el.id.startsWith('score-tab-')) el.style.display = 'none';
+            el = el.nextElementSibling;
+        }
+        document.getElementById(tabId).style.display = 'block';
+    }
+
+    // ESC 关闭
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            closeScoreViewer();
+            closeScoreOverlay();
+        }
+    });
+
+</script>
+
+</body>
+</html>

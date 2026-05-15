@@ -1374,6 +1374,7 @@
     let bonusPending = false;
     let bonusWaitStartTime = 0;
     let bonusWaitEndTime = 0;
+    let bonusPrimedAudio = null;
     let bonusSongAudio = null;
     let bonusSongPlaying = false;
     let bonusSongStartPerf = 0;
@@ -1581,6 +1582,7 @@
         if (!isBonusClickable()) return false;
         unlockAudio();
         if (!gRunning) startClock();
+        primeBonusSongAudio();
         const loopTime = getLoopTime();
         const triggerLoopTime = Math.max(0, MASTER_LOOP_DURATION - BONUS_PRE_ROLL_SECONDS);
         const remainingCurrentLoop = loopTime < 0.05 ? MASTER_LOOP_DURATION : MASTER_LOOP_DURATION - loopTime;
@@ -1633,7 +1635,10 @@
             startBonusVideo();
         }
 
-        const a = takePreparedAudio(BONUS_TRACK_SRC);
+        const a = bonusPrimedAudio || takePreparedAudio(BONUS_TRACK_SRC);
+        bonusPrimedAudio = null;
+        a.muted = false;
+        a.volume = 1;
         a.loop = false;
         bonusSongAudio = a;
         bonusSongPlaying = true;
@@ -1662,6 +1667,40 @@
         a.load();
     }
 
+    function primeBonusSongAudio() {
+        releaseBonusPrimedAudio();
+        if (!BONUS_TRACK_SRC) return;
+        const a = takePreparedAudio(BONUS_TRACK_SRC);
+        bonusPrimedAudio = a;
+        a.muted = true;
+        a.volume = 0;
+        a.loop = false;
+        try {
+            a.currentTime = 0;
+        } catch (err) {}
+
+        const settle = () => {
+            if (bonusPrimedAudio !== a || bonusSongAudio === a) return;
+            try {
+                a.pause();
+                a.currentTime = 0;
+            } catch (err) {}
+            a.muted = false;
+            a.volume = 1;
+        };
+
+        try {
+            const playPromise = a.play();
+            if (playPromise && typeof playPromise.then === 'function') {
+                playPromise.then(() => setTimeout(settle, 90)).catch(settle);
+            } else {
+                setTimeout(settle, 90);
+            }
+        } catch (err) {
+            settle();
+        }
+    }
+
     function finishBonusSong() {
         if (!bonusSongPlaying && !bonusSongAudio) return;
         bonusPending = false;
@@ -1680,6 +1719,12 @@
         if (!bonusSongAudio) return;
         releasePreparedAudio(bonusSongAudio);
         bonusSongAudio = null;
+    }
+
+    function releaseBonusPrimedAudio() {
+        if (!bonusPrimedAudio) return;
+        releasePreparedAudio(bonusPrimedAudio);
+        bonusPrimedAudio = null;
     }
 
     function prepareBonusVideoElement() {
@@ -1764,6 +1809,7 @@
         bonusSlotsSilenced = false;
         bonusFadeLoopStartTime = 0;
         bonusFadeLoopStarted = false;
+        releaseBonusPrimedAudio();
         stopBonusSongAudio();
         stopBonusVideo();
         setActiveSlotAudioMode('normal', resumeSlots);
@@ -2176,15 +2222,23 @@
         spriteFrames = {};
         spriteBoundsCache = new WeakMap();
         spriteSourceBounds = {};
+        const mobileMode = isTouchDevice();
         Object.entries(ICON_SRC).forEach(([instId, src]) => {
             const img = new Image();
-            img.onload = () => { instrumentImages[instId] = img; };
+            img.onload = () => {
+                instrumentImages[instId] = img;
+                if (img.decode) img.decode().catch(() => {});
+            };
             img.onerror = () => { console.warn(`Failed to load instrument icon: ${src}`); };
             img.src = src;
         });
         Object.entries(SPRITE_FRAME_FILES).forEach(([instId, files]) => {
-            spriteFrames[instId] = files.map(src => {
+            const frameFiles = mobileMode ? files.filter((_, index) => index % 2 === 0) : files;
+            spriteFrames[instId] = frameFiles.map(src => {
                 const img = new Image();
+                img.onload = () => {
+                    if (img.decode) img.decode().catch(() => {});
+                };
                 img.onerror = () => { console.warn(`Failed to load ${instId} frame: ${src}`); };
                 img.src = src;
                 return img;
@@ -2307,7 +2361,7 @@
             if (p.life <= 0) particles.splice(i, 1);
         }
 
-        if (Math.random() < 0.2) {
+        if (!isTouchDevice() && Math.random() < 0.2) {
             createParticle(Math.random() * CONFIG.width, CONFIG.height, 'rgba(255,255,255,0.1)', 0.5);
         }
     }
@@ -2834,12 +2888,16 @@
         const cfg = SPRITE_DRAW_CONFIG[instId] || SPRITE_DRAW_CONFIG.default;
         ctx.save();
         if (options.muted) {
-            ctx.filter = 'grayscale(1) saturate(0.08) opacity(0.62)';
-            ctx.shadowColor = 'rgba(100,116,139,0.12)';
-            ctx.shadowBlur = 8;
+            if (isTouchDevice()) {
+                ctx.globalAlpha = 0.52;
+            } else {
+                ctx.filter = 'grayscale(1) saturate(0.08) opacity(0.62)';
+                ctx.shadowColor = 'rgba(100,116,139,0.12)';
+                ctx.shadowBlur = 8;
+            }
         } else {
             ctx.shadowColor = 'rgba(89,111,168,0.25)';
-            ctx.shadowBlur = 22;
+            ctx.shadowBlur = isTouchDevice() ? 0 : 22;
         }
         const bounds = getSpriteSourceBounds(instId, usableFrames[0]);
         drawImageContentFitHeight(
@@ -3441,12 +3499,13 @@
 
     // --- 粒子与工具 ---
     function createParticle(x, y, color, speedFn) {
+        if (isTouchDevice() && particles.length > 24) return;
         particles.push({
             x: x, y: y,
-            size: Math.random() * 2,
+            size: isTouchDevice() ? Math.random() * 1.3 : Math.random() * 2,
             color: color,
             alpha: 1,
-            life: 40 + Math.random() * 60,
+            life: isTouchDevice() ? 24 + Math.random() * 32 : 40 + Math.random() * 60,
             seed: Math.random() * 100,
             speed: (Math.random() * 1 + 0.5) * (speedFn || 1)
         });
@@ -3582,7 +3641,7 @@
     canvas.addEventListener('touchend', onUp, {passive: false});
 
     function loop(ts = performance.now()) {
-        const minFrameMs = isTouchDevice() ? 1000 / 30 : 0;
+        const minFrameMs = isTouchDevice() ? 1000 / 20 : 0;
         if (!lastRenderTs || !minFrameMs || ts - lastRenderTs >= minFrameMs) {
             update();
             draw();

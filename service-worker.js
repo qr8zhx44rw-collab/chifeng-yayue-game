@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chifeng-yayue-assets-v4-mobile-fit';
+const CACHE_NAME = 'chifeng-yayue-assets-v5-mobile-touch';
 
 self.addEventListener('install', event => {
     event.waitUntil(self.skipWaiting());

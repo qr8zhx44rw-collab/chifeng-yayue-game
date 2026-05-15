@@ -1426,6 +1426,7 @@
     // 任意点击也触发解锁
     document.addEventListener('click', unlockAudio, { once: true });
     document.addEventListener('mousedown', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true, passive: true, capture: true });
     if (splashStartBtn) {
         splashStartBtn.addEventListener('click', () => {
             unlockAudio();

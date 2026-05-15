@@ -53,6 +53,30 @@
             box-shadow: 0 0 20px rgba(212,175,55,0.6);
         }
 
+        #bonusVideoOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 260;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.1), rgba(0,0,0,0.82));
+            backdrop-filter: blur(3px);
+        }
+        #bonusVideoOverlay.playing {
+            display: flex;
+        }
+        #bonusVideo {
+            width: min(88vw, 1180px);
+            max-width: 145vh;
+            max-height: 82vh;
+            aspect-ratio: 16 / 9;
+            border-radius: 28px;
+            background: #000;
+            box-shadow: 0 32px 100px rgba(0,0,0,0.35);
+            object-fit: cover;
+        }
+
         /* 曲谱覆盖层 */
         #scoreOverlay {
             display: none;
@@ -814,6 +838,9 @@
 
 <div id="loading">资源加载中...</div>
 <canvas id="gameCanvas"></canvas>
+<div id="bonusVideoOverlay" aria-hidden="true">
+    <video id="bonusVideo" muted playsinline preload="auto"></video>
+</div>
 
 <!-- 音频解锁由首次用户交互自动触发 -->
 
@@ -883,6 +910,8 @@
     const loadingDiv = document.getElementById('loading');
     const splashEl = document.getElementById('page-splash');
     const splashStartBtn = document.getElementById('splashStart');
+    const bonusVideoOverlay = document.getElementById('bonusVideoOverlay');
+    const bonusVideoEl = document.getElementById('bonusVideo');
 
     // 游戏配置
     const CONFIG = {
@@ -923,13 +952,16 @@
 
     // --- 音乐播放系统 ---
     let AUDIO_SRC = {
-        'snare': 'song1/军鼓.mp3',
-        'kick': 'song1/底鼓.mp3',
-        'cymbal': 'song1/镲片.mp3',
-        'bass': 'song1/电贝斯.mp3',
-        'keyboard': 'song1/电钢琴.mp3',
-        'flute': 'song1/笛子.mp3'
+        'snare': 'song1无淡入/军鼓.mp3',
+        'kick': 'song1无淡入/底鼓.mp3',
+        'cymbal': 'song1无淡入/镲片.mp3',
+        'bass': 'song1无淡入/电贝斯.mp3',
+        'keyboard': 'song1无淡入/电钢琴.mp3',
+        'flute': 'song1无淡入/笛子.mp3'
     };
+    let NORMAL_AUDIO_SRC = AUDIO_SRC;
+    let BONUS_AUDIO_SRC = AUDIO_SRC;
+    let activeSlotAudioMode = 'normal';
     let ICON_SRC = {
         'snare': 'song1乐器图片/大军鼓.png',
         'kick': 'song1乐器图片/低鼓.png',
@@ -1073,9 +1105,13 @@
     };
     let BONUS_TRACK_SRC = 'song1/完整曲目1.mp3';
     let BONUS_TRACK_DURATION = 40.488;
+    let BONUS_VIDEO_SRC = '';
     let MASTER_LOOP_DURATION = Math.max(...Object.values(AUDIO_DURATION));
     const ENTRY_SEGMENT_DURATION = 5;
     const BONUS_PRE_ROLL_SECONDS = 2;
+    let BONUS_VIDEO_NORMAL_RATE = 0.75;
+    let BONUS_VIDEO_END_RATE = 0.75;
+    let BONUS_VIDEO_END_SLOW_SECONDS = 0;
     const LOOP_PROGRESS_BUTTON = { x: CONFIG.width - 118, y: 96, radius: 44 };
     const SONG_SWITCH = { x: 180, y: 70, w: 232, h: 34, gap: 10 };
     let activeSongId = 'song1';
@@ -1101,6 +1137,14 @@
                 bass: 'song1/电贝斯.mp3',
                 keyboard: 'song1/电钢琴.mp3',
                 flute: 'song1/笛子.mp3'
+            },
+            normalAudioSrc: {
+                snare: 'song1无淡入/军鼓.mp3',
+                kick: 'song1无淡入/底鼓.mp3',
+                cymbal: 'song1无淡入/镲片.mp3',
+                bass: 'song1无淡入/电贝斯.mp3',
+                keyboard: 'song1无淡入/电钢琴.mp3',
+                flute: 'song1无淡入/笛子.mp3'
             },
             iconSrc: {
                 snare: 'song1乐器图片/大军鼓.png',
@@ -1136,7 +1180,11 @@
                 flute: 10.488
             },
             bonusTrackSrc: 'song1/完整曲目1.mp3',
-            bonusTrackDuration: 40.488
+            bonusTrackDuration: 40.488,
+            bonusVideoSrc: 'song1动画/song1.mp4',
+            bonusVideoNormalRate: 0.75,
+            bonusVideoEndRate: 0.5,
+            bonusVideoEndSlowSeconds: 0.5
         },
         song2: {
             id: 'song2',
@@ -1158,6 +1206,14 @@
                 choir_song2: 'song2/合唱.mp3',
                 synth_song2: 'song2/合成器.mp3',
                 bamboo_flute_song2: 'song2/竹笛.mp3'
+            },
+            normalAudioSrc: {
+                china_drum: 'song2无淡入/中国大鼓.mp3',
+                double_bass_song2: 'song2无淡入/低音提琴.mp3',
+                guzheng_song2: 'song2无淡入/古筝.mp3',
+                choir_song2: 'song2无淡入/合唱.mp3',
+                synth_song2: 'song2无淡入/合成器.mp3',
+                bamboo_flute_song2: 'song2无淡入/竹笛.mp3'
             },
             iconSrc: {
                 china_drum: 'song2乐器图片/中国大鼓.png',
@@ -1193,7 +1249,11 @@
                 bamboo_flute_song2: 10.392
             },
             bonusTrackSrc: 'song2/完整曲目2.mp3',
-            bonusTrackDuration: 42
+            bonusTrackDuration: 42,
+            bonusVideoSrc: 'song2动画/song2.mp4',
+            bonusVideoNormalRate: 0.75,
+            bonusVideoEndRate: 0.75,
+            bonusVideoEndSlowSeconds: 0
         }
     };
     let gTime    = 0;     // 全局时钟（秒）
@@ -1222,10 +1282,16 @@
     let bonusSongStartPerf = 0;
     let bonusMuteSlotsAtTime = 0;
     let bonusSlotsSilenced = false;
+    let bonusFadeLoopStartTime = 0;
+    let bonusFadeLoopStarted = false;
+    let bonusVideoPlaying = false;
+    let bonusVideoSlowRafId = null;
     let loopStarted = false;
 
     // --- 音乐时钟 ---
     let audioCtx = null;
+    const ARCHIVE_BGM_SRC = '背景音乐/雁尾完整版.mp3';
+    let archiveMusicAudio = null;
 
     function unlockAudio() {
         // 解锁浏览器音频自动播放限制
@@ -1260,14 +1326,22 @@
         INSTRUMENTS = config.instruments;
         INSTRUMENT_MAP = Object.fromEntries(INSTRUMENTS.map(inst => [inst.id, inst]));
         DOCK_ROWS = config.dockRows;
-        AUDIO_SRC = config.audioSrc;
+        NORMAL_AUDIO_SRC = config.normalAudioSrc || config.audioSrc;
+        BONUS_AUDIO_SRC = config.audioSrc;
+        AUDIO_SRC = NORMAL_AUDIO_SRC;
+        activeSlotAudioMode = 'normal';
         ICON_SRC = config.iconSrc;
         SPRITE_FRAME_FILES = config.spriteFrameFiles;
         SPRITE_DRAW_CONFIG = config.spriteDrawConfig;
         AUDIO_DURATION = config.audioDuration;
         BONUS_TRACK_SRC = config.bonusTrackSrc;
         BONUS_TRACK_DURATION = config.bonusTrackDuration || 0;
+        BONUS_VIDEO_SRC = config.bonusVideoSrc || '';
+        BONUS_VIDEO_NORMAL_RATE = config.bonusVideoNormalRate || 1;
+        BONUS_VIDEO_END_RATE = config.bonusVideoEndRate || BONUS_VIDEO_NORMAL_RATE;
+        BONUS_VIDEO_END_SLOW_SECONDS = config.bonusVideoEndSlowSeconds || 0;
         MASTER_LOOP_DURATION = Math.max(...Object.values(AUDIO_DURATION));
+        prepareBonusVideoElement();
     }
 
     function selectSong(songId) {
@@ -1392,31 +1466,37 @@
         if (!gRunning) startClock();
         const loopTime = getLoopTime();
         const triggerLoopTime = Math.max(0, MASTER_LOOP_DURATION - BONUS_PRE_ROLL_SECONDS);
-        // 右侧圆圈按整秒显示；进入“08s”这一档后点击，排到下一轮的触发点，避免立刻抢拍进入。
-        const triggerLockoutTime = Math.max(0, Math.floor(triggerLoopTime));
-        const useNextLoopTrigger = loopTime >= triggerLockoutTime;
-        const waitSeconds = useNextLoopTrigger
-            ? (MASTER_LOOP_DURATION - loopTime) + triggerLoopTime
-            : triggerLoopTime - loopTime;
-        const muteDelay = useNextLoopTrigger
-            ? waitSeconds + BONUS_PRE_ROLL_SECONDS
-            : MASTER_LOOP_DURATION - loopTime;
+        const remainingCurrentLoop = loopTime < 0.05 ? MASTER_LOOP_DURATION : MASTER_LOOP_DURATION - loopTime;
+        const waitSeconds = remainingCurrentLoop + triggerLoopTime;
+        const muteDelay = remainingCurrentLoop + MASTER_LOOP_DURATION;
+        setActiveSlotAudioMode('normal', false);
+        prepareSlotsForBonusPlayback();
+        syncAllSlotAudio(false);
+        resumeActiveSlotAudio();
         bonusPending = true;
         bonusWaitStartTime = gTime;
         bonusWaitEndTime = gTime + waitSeconds;
         bonusMuteSlotsAtTime = gTime + muteDelay;
+        bonusFadeLoopStartTime = gTime + remainingCurrentLoop;
+        bonusFadeLoopStarted = false;
         bonusSlotsSilenced = false;
         if (waitSeconds <= 0.05) startBonusSong();
         return true;
     }
 
     function updateBonusPlaybackState() {
+        if (bonusPending && !bonusFadeLoopStarted && gTime + 0.02 >= bonusFadeLoopStartTime) {
+            bonusFadeLoopStarted = true;
+            prepareSlotsForBonusPlayback();
+            setActiveSlotAudioMode('bonus', true);
+        }
         if (bonusPending && gTime + 0.02 >= bonusWaitEndTime) {
             startBonusSong();
         }
         if (bonusSongPlaying && !bonusSlotsSilenced && gTime + 0.02 >= bonusMuteSlotsAtTime) {
             silenceAllSlotAudio();
             bonusSlotsSilenced = true;
+            startBonusVideo();
         }
         if (bonusSongPlaying && bonusSongAudio) {
             const duration = getBonusTrackDuration();
@@ -1433,6 +1513,7 @@
         if (!bonusMuteSlotsAtTime || gTime + 0.02 >= bonusMuteSlotsAtTime) {
             silenceAllSlotAudio();
             bonusSlotsSilenced = true;
+            startBonusVideo();
         }
 
         const a = new Audio(BONUS_TRACK_SRC);
@@ -1470,7 +1551,11 @@
         bonusSongPlaying = false;
         bonusMuteSlotsAtTime = 0;
         bonusSlotsSilenced = false;
+        bonusFadeLoopStartTime = 0;
+        bonusFadeLoopStarted = false;
         stopBonusSongAudio();
+        stopBonusVideo();
+        setActiveSlotAudioMode('normal', false);
         restartMixFromLoopStart();
     }
 
@@ -1479,6 +1564,77 @@
         bonusSongAudio.pause();
         bonusSongAudio.src = '';
         bonusSongAudio = null;
+    }
+
+    function prepareBonusVideoElement() {
+        if (!bonusVideoEl) return;
+        stopBonusVideo();
+        bonusVideoEl.muted = true;
+        bonusVideoEl.volume = 0;
+        bonusVideoEl.playbackRate = BONUS_VIDEO_NORMAL_RATE;
+        bonusVideoEl.playsInline = true;
+        bonusVideoEl.src = BONUS_VIDEO_SRC || '';
+        if (BONUS_VIDEO_SRC) bonusVideoEl.load();
+    }
+
+    function startBonusVideo() {
+        if (!BONUS_VIDEO_SRC || !bonusVideoEl || !bonusVideoOverlay || bonusVideoPlaying) return;
+        bonusVideoPlaying = true;
+        bonusVideoEl.muted = true;
+        bonusVideoEl.volume = 0;
+        bonusVideoEl.playbackRate = BONUS_VIDEO_NORMAL_RATE;
+        bonusVideoEl.playsInline = true;
+        if (!bonusVideoEl.src) bonusVideoEl.src = BONUS_VIDEO_SRC;
+        bonusVideoOverlay.classList.add('playing');
+        bonusVideoOverlay.setAttribute('aria-hidden', 'false');
+        bonusVideoEl.onended = () => stopBonusVideo();
+        bonusVideoEl.onerror = () => stopBonusVideo();
+        try {
+            bonusVideoEl.currentTime = 0;
+        } catch (err) {
+            // Safari/Chrome may reject seeking before metadata is ready; playback still starts from the beginning after load.
+        }
+        startBonusVideoSlowdownMonitor();
+        bonusVideoEl.play().catch(() => {
+            stopBonusVideo();
+        });
+    }
+
+    function startBonusVideoSlowdownMonitor() {
+        stopBonusVideoSlowdownMonitor();
+        const updateRate = () => {
+            if (!bonusVideoPlaying || !bonusVideoEl) return;
+            const duration = bonusVideoEl.duration;
+            const isInEnding = Number.isFinite(duration)
+                && duration > BONUS_VIDEO_END_SLOW_SECONDS
+                && duration - bonusVideoEl.currentTime <= BONUS_VIDEO_END_SLOW_SECONDS;
+            bonusVideoEl.playbackRate = isInEnding ? BONUS_VIDEO_END_RATE : BONUS_VIDEO_NORMAL_RATE;
+            bonusVideoSlowRafId = requestAnimationFrame(updateRate);
+        };
+        updateRate();
+    }
+
+    function stopBonusVideoSlowdownMonitor() {
+        if (!bonusVideoSlowRafId) return;
+        cancelAnimationFrame(bonusVideoSlowRafId);
+        bonusVideoSlowRafId = null;
+    }
+
+    function stopBonusVideo() {
+        bonusVideoPlaying = false;
+        stopBonusVideoSlowdownMonitor();
+        if (bonusVideoOverlay) {
+            bonusVideoOverlay.classList.remove('playing');
+            bonusVideoOverlay.setAttribute('aria-hidden', 'true');
+        }
+        if (!bonusVideoEl) return;
+        bonusVideoEl.pause();
+        bonusVideoEl.onended = null;
+        bonusVideoEl.onerror = null;
+        bonusVideoEl.playbackRate = BONUS_VIDEO_NORMAL_RATE;
+        try {
+            bonusVideoEl.currentTime = 0;
+        } catch (err) {}
     }
 
     function cancelBonusMode(resumeSlots = true) {
@@ -1490,7 +1646,11 @@
         bonusSongPlaying = false;
         bonusMuteSlotsAtTime = 0;
         bonusSlotsSilenced = false;
+        bonusFadeLoopStartTime = 0;
+        bonusFadeLoopStarted = false;
         stopBonusSongAudio();
+        stopBonusVideo();
+        setActiveSlotAudioMode('normal', resumeSlots);
         if (resumeSlots) resumeActiveSlotAudio();
         return true;
     }
@@ -1504,12 +1664,32 @@
         });
     }
 
+    function setActiveSlotAudioMode(mode, restartActive = false) {
+        const nextMode = mode === 'bonus' ? 'bonus' : 'normal';
+        const nextSource = nextMode === 'bonus' ? BONUS_AUDIO_SRC : NORMAL_AUDIO_SRC;
+        const changed = activeSlotAudioMode !== nextMode || AUDIO_SRC !== nextSource;
+        activeSlotAudioMode = nextMode;
+        AUDIO_SRC = nextSource;
+        if (restartActive && changed) restartActiveSlotAudio();
+    }
+
+    function restartActiveSlotAudio() {
+        slots.forEach((slot, index) => {
+            if (!slot.data || slot.paused || slot.waiting) return;
+            playSlotAudio(index, slot.data.id, false);
+        });
+    }
+
     function resumeActiveSlotAudio() {
         if (!slots.some(slot => slot.data && !slot.paused && !slot.waiting)) return;
         if (!gRunning) startClock();
         slots.forEach((slot, index) => {
-            if (!slot.data || slot.paused || slot.waiting || slotAudio[index]) return;
-            playSlotAudio(index, slot.data.id, false);
+            if (!slot.data || slot.paused || slot.waiting) return;
+            if (slotAudio[index]) {
+                seekAndPlayAudio(slotAudio[index], slot.data.id, false);
+            } else {
+                playSlotAudio(index, slot.data.id, false);
+            }
         });
     }
 
@@ -1529,6 +1709,7 @@
 
     function restartMixFromLoopStart() {
         silenceAllSlotAudio();
+        setActiveSlotAudioMode('normal', false);
         slots.forEach(slot => {
             if (!slot.data) return;
             clearSlotHoldState(slot);
@@ -1573,9 +1754,10 @@
     function activateReadySlots() {
         if (bonusSongPlaying) return;
         slots.forEach((slot, index) => {
-            if (!slot.data || !slot.waiting || slot.paused) return;
+            if (!slot.data || !slot.waiting) return;
             if (gTime + 0.02 < slot.waitEndTime) return;
             slot.waiting = false;
+            slot.paused = false;
             playSlotAudio(index, slot.data.id, false);
         });
     }
@@ -1712,6 +1894,7 @@
     function toggleSlotPauseState(slotIdx) {
         const slot = slots[slotIdx];
         if (!slot || !slot.data) return false;
+        if (slot.waiting) return true;
         const wasBonusActive = cancelBonusMode(false);
         slot.paused = !slot.paused;
         if (!slot.paused) slot.waiting = false;
@@ -1826,7 +2009,7 @@
         if (windowAspect < aspect) scale = window.innerWidth / CONFIG.width;
         else scale = window.innerHeight / CONFIG.height;
 
-        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        const dpr = Math.min(1.5, Math.max(1, window.devicePixelRatio || 1));
         const cssW = CONFIG.width * scale;
         const cssH = CONFIG.height * scale;
 
@@ -1838,7 +2021,7 @@
         // 逻辑坐标仍以 CONFIG 为准，内部按 DPR 放大渲染，避免高清素材发糊
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        ctx.imageSmoothingQuality = 'medium';
     }
 
     function update() {
@@ -3247,8 +3430,25 @@
         { name: '现代混音声部', family: '网页改编', text: '当前游戏里的贝斯、电子琴、笛子是为了让传统素材进入现代互动混音场景，属于再创作声部。' }
     ];
 
+    function playArchiveMusic() {
+        if (!archiveMusicAudio) {
+            archiveMusicAudio = new Audio(ARCHIVE_BGM_SRC);
+            archiveMusicAudio.loop = true;
+            archiveMusicAudio.volume = 0.35;
+        }
+        archiveMusicAudio.currentTime = 0;
+        archiveMusicAudio.play().catch(() => {});
+    }
+
+    function stopArchiveMusic() {
+        if (!archiveMusicAudio) return;
+        archiveMusicAudio.pause();
+        archiveMusicAudio.currentTime = 0;
+    }
+
     function openScoreOverlay() {
         document.getElementById('scoreOverlay').classList.add('open');
+        playArchiveMusic();
         setArchiveTab('scores');
         document.getElementById('scoreSearch').value = '';
         currentFilter = '全部';
@@ -3258,6 +3458,7 @@
 
     function closeScoreOverlay() {
         document.getElementById('scoreOverlay').classList.remove('open');
+        stopArchiveMusic();
     }
 
     function setArchiveTab(tab) {

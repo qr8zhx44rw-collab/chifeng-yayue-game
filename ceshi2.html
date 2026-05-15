@@ -1637,6 +1637,7 @@
 
         const a = bonusPrimedAudio || takePreparedAudio(BONUS_TRACK_SRC);
         bonusPrimedAudio = null;
+        const wasPrimedAndPlaying = !a.paused;
         a.muted = false;
         a.volume = 1;
         a.loop = false;
@@ -1649,8 +1650,10 @@
             try {
                 a.currentTime = 0;
                 bonusSongStartPerf = performance.now();
+                if (wasPrimedAndPlaying && !a.paused) return;
                 a.play().catch(() => {
                     if (bonusSongAudio !== a) return;
+                    if (!a.paused) return;
                     bonusSongPlaying = false;
                     stopBonusSongAudio();
                     resumeActiveSlotAudio();
@@ -1663,8 +1666,10 @@
         };
         a.onended = finishBonusSong;
         if (a.readyState >= 2) startPlay();
-        else a.addEventListener('canplay', startPlay, { once: true });
-        a.load();
+        else {
+            a.addEventListener('canplay', startPlay, { once: true });
+            a.load();
+        }
     }
 
     function primeBonusSongAudio() {
@@ -1679,25 +1684,16 @@
             a.currentTime = 0;
         } catch (err) {}
 
-        const settle = () => {
-            if (bonusPrimedAudio !== a || bonusSongAudio === a) return;
-            try {
-                a.pause();
-                a.currentTime = 0;
-            } catch (err) {}
-            a.muted = false;
-            a.volume = 1;
-        };
-
         try {
             const playPromise = a.play();
             if (playPromise && typeof playPromise.then === 'function') {
-                playPromise.then(() => setTimeout(settle, 90)).catch(settle);
-            } else {
-                setTimeout(settle, 90);
+                playPromise.catch(() => {
+                    if (bonusPrimedAudio !== a || bonusSongAudio === a) return;
+                    releaseBonusPrimedAudio();
+                });
             }
         } catch (err) {
-            settle();
+            releaseBonusPrimedAudio();
         }
     }
 
@@ -2275,6 +2271,7 @@
 
         for (let i = 0; i < TRACK_COUNT; i++) {
             slots.push({
+                index: i,
                 x: startX + i * (slotW + slotGap),
                 y: slotY,
                 w: slotW,
@@ -2842,11 +2839,12 @@
 
         const bonusActive = isBonusModeActive();
         const muted = !bonusActive && (paused || slot.waiting);
+        const mobileFreeze = shouldFreezeSpriteOnMobile(slot);
         const accent = muted ? '#a8b2c4' : data.color;
         const circleX = slot.x + slot.w / 2;
         const circleY = slot.y + 126;
 
-        if (drawInstrumentSprite(ctx, slot, data.id, { muted, firstFrame: muted })) {
+        if (drawInstrumentSprite(ctx, slot, data.id, { muted, firstFrame: muted || mobileFreeze })) {
             // 精灵动画优先；等待和暂停时显示灰色定格帧。
         } else {
             ctx.save();
@@ -2868,6 +2866,13 @@
         ctx.textAlign = 'center';
         ctx.fillText(data.name, circleX, slot.y + slot.h - 38);
         if (slot.waiting && !bonusActive) drawWaitingProgress(ctx, circleX, slot.y + slot.h - 16, getWaitProgress(slot), data.color);
+    }
+
+    function shouldFreezeSpriteOnMobile(slot) {
+        if (!isTouchDevice() || !slot || !slot.data || slot.paused || slot.waiting) return false;
+        const activeSlots = slots.filter(item => item.data && !item.paused && !item.waiting);
+        if (activeSlots.length <= 2) return false;
+        return activeSlots.indexOf(slot) >= 2;
     }
 
     function drawKeyboardSprite(ctx, slot) {

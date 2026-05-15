@@ -30,6 +30,77 @@
             pointer-events: none;
         }
 
+        #rotateHint {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 320;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            background:
+                radial-gradient(circle at 50% 18%, rgba(212,175,55,0.14), transparent 32%),
+                linear-gradient(180deg, rgba(255,255,255,0.96), rgba(240,245,252,0.96));
+            text-align: center;
+            color: #1f2937;
+        }
+        .rotate-card {
+            width: min(340px, 88vw);
+            padding: 30px 26px;
+            border: 1px solid rgba(212,175,55,0.35);
+            border-radius: 28px;
+            background: rgba(255,255,255,0.9);
+            box-shadow: 0 26px 80px rgba(31,41,55,0.16);
+        }
+        .rotate-icon {
+            width: 78px;
+            height: 78px;
+            margin: 0 auto 18px;
+            border-radius: 24px;
+            display: grid;
+            place-items: center;
+            color: #d4af37;
+            font-size: 42px;
+            background: #ffffff;
+            box-shadow: inset 0 0 0 2px rgba(212,175,55,0.28), 0 14px 34px rgba(31,41,55,0.1);
+        }
+        .rotate-card h2 {
+            margin: 0 0 10px;
+            color: #8b6b18;
+            font-size: 22px;
+            letter-spacing: 0.16em;
+        }
+        .rotate-card p {
+            margin: 0;
+            color: #667085;
+            line-height: 1.8;
+            font-size: 14px;
+        }
+
+        @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+            #rotateHint { display: flex; }
+            canvas { opacity: 0.22; filter: blur(2px); }
+            #scoreBtn { opacity: 0; pointer-events: none; }
+        }
+
+        @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+            body {
+                align-items: center;
+                background: #f8fafc;
+            }
+            canvas {
+                box-shadow: none;
+                max-width: 100vw;
+                max-height: 100vh;
+            }
+            #scoreBtn {
+                top: max(10px, env(safe-area-inset-top));
+                right: max(12px, env(safe-area-inset-right));
+                padding: 6px 14px;
+                font-size: 13px;
+            }
+        }
+
         /* 曲谱按钮 */
         #scoreBtn {
             position: fixed;
@@ -838,6 +909,13 @@
 
 <div id="loading">资源加载中...</div>
 <canvas id="gameCanvas"></canvas>
+<div id="rotateHint" aria-hidden="true">
+    <div class="rotate-card">
+        <div class="rotate-icon">↻</div>
+        <h2>请横屏游玩</h2>
+        <p>手机端会自动识别触屏设备。请把手机横过来，横屏后会进入适合游戏操作的比例。</p>
+    </div>
+</div>
 <div id="bonusVideoOverlay" aria-hidden="true">
     <video id="bonusVideo" muted playsinline preload="auto"></video>
 </div>
@@ -1264,6 +1342,7 @@
     let lastLoopIndex = 0;
     // 每个槽位对应的音频对象
     let slotAudio = [];
+    const audioPool = {};
 
     let input = {
         x: 0, y: 0, isDown: false,
@@ -1342,6 +1421,7 @@
         BONUS_VIDEO_END_SLOW_SECONDS = config.bonusVideoEndSlowSeconds || 0;
         MASTER_LOOP_DURATION = Math.max(...Object.values(AUDIO_DURATION));
         prepareBonusVideoElement();
+        preloadSongAudio(config);
     }
 
     function selectSong(songId) {
@@ -1516,7 +1596,7 @@
             startBonusVideo();
         }
 
-        const a = new Audio(BONUS_TRACK_SRC);
+        const a = takePreparedAudio(BONUS_TRACK_SRC);
         a.loop = false;
         bonusSongAudio = a;
         bonusSongPlaying = true;
@@ -1539,7 +1619,7 @@
                 resumeActiveSlotAudio();
             }
         };
-        a.addEventListener('ended', finishBonusSong, { once: true });
+        a.onended = finishBonusSong;
         if (a.readyState >= 2) startPlay();
         else a.addEventListener('canplay', startPlay, { once: true });
         a.load();
@@ -1561,8 +1641,7 @@
 
     function stopBonusSongAudio() {
         if (!bonusSongAudio) return;
-        bonusSongAudio.pause();
-        bonusSongAudio.src = '';
+        releasePreparedAudio(bonusSongAudio);
         bonusSongAudio = null;
     }
 
@@ -1658,8 +1737,8 @@
     function silenceAllSlotAudio() {
         slotAudio.forEach((a, index) => {
             if (!a) return;
-            a.pause();
-            a.src = '';
+            a._yayuePlayToken = null;
+            releasePreparedAudio(a);
             slotAudio[index] = null;
         });
     }
@@ -1671,6 +1750,66 @@
         activeSlotAudioMode = nextMode;
         AUDIO_SRC = nextSource;
         if (restartActive && changed) restartActiveSlotAudio();
+    }
+
+    function getSongAudioSources(config = activeSong) {
+        if (!config) return [];
+        const sources = [
+            ...Object.values(config.normalAudioSrc || {}),
+            ...Object.values(config.audioSrc || {}),
+            config.bonusTrackSrc,
+            ARCHIVE_BGM_SRC
+        ].filter(Boolean);
+        return [...new Set(sources)];
+    }
+
+    function createPreparedAudio(src) {
+        const a = new Audio(src);
+        a.preload = 'auto';
+        a.loop = false;
+        a._yayueSrc = src;
+        a.load();
+        return a;
+    }
+
+    function preloadSongAudio(config = activeSong) {
+        getSongAudioSources(config).forEach(src => {
+            if (!audioPool[src]) audioPool[src] = [];
+            if (audioPool[src].length === 0) {
+                audioPool[src].push(createPreparedAudio(src));
+            }
+        });
+    }
+
+    function takePreparedAudio(src) {
+        const pool = audioPool[src] || [];
+        while (pool.length) {
+            const a = pool.pop();
+            if (a && a._yayueSrc === src) {
+                a.loop = false;
+                return a;
+            }
+        }
+        return createPreparedAudio(src);
+    }
+
+    function releasePreparedAudio(a) {
+        if (!a) return;
+        const src = a._yayueSrc;
+        try {
+            a.pause();
+            a.currentTime = 0;
+        } catch (err) {}
+        a.loop = false;
+        a.onended = null;
+        a.onerror = null;
+        a._yayuePlayToken = null;
+        if (!src) {
+            a.src = '';
+            return;
+        }
+        if (!audioPool[src]) audioPool[src] = [];
+        audioPool[src].push(a);
     }
 
     function restartActiveSlotAudio() {
@@ -1725,6 +1864,17 @@
         return slots.some((slot, index) => index !== excludeSlotIdx && slot.data && !slot.paused && !slot.waiting);
     }
 
+    function hasWaitingInstrument(excludeSlotIdx = null) {
+        return slots.some((slot, index) => index !== excludeSlotIdx && slot.data && slot.waiting);
+    }
+
+    function hasClockActiveInstrument(excludeSlotIdx = null) {
+        return slots.some((slot, index) => {
+            if (index === excludeSlotIdx || !slot.data) return false;
+            return slot.waiting || !slot.paused;
+        });
+    }
+
     function seekAndPlayAudio(a, instId, restart = false) {
         const duration = AUDIO_DURATION[instId] || a.duration || MASTER_LOOP_DURATION;
         const loopTime = getLoopTime();
@@ -1765,18 +1915,24 @@
     // 放入乐器时启动音频
     function playSlotAudio(slotIdx, instId, resetIfAlone = true) {
         stopSlotAudio(slotIdx);
-        if (resetIfAlone && !hasPlayingInstrument(slotIdx)) gTime = 0;
+        if (resetIfAlone && !hasPlayingInstrument(slotIdx) && !hasWaitingInstrument(slotIdx)) gTime = 0;
         if (!gRunning) startClock();
         const src = AUDIO_SRC[instId];
         if (!src) return;
-        const a = new Audio(src);
+        const a = takePreparedAudio(src);
         a.loop = false;
+        const playToken = Symbol('slotAudio');
+        a._yayuePlayToken = playToken;
+        slotAudio[slotIdx] = a;
         const startPlay = () => {
+            if (slotAudio[slotIdx] !== a || a._yayuePlayToken !== playToken) return;
             seekAndPlayAudio(a, instId, false);
         };
         if (a.readyState >= 2) { startPlay(); }
-        else { a.addEventListener('canplay', startPlay, { once: true }); }
-        slotAudio[slotIdx] = a;
+        else {
+            a.addEventListener('canplay', startPlay, { once: true });
+            a.load();
+        }
     }
 
     function scheduleSlotEntry(slotIdx) {
@@ -1797,7 +1953,11 @@
     // 移除乐器时停止音频
     function stopSlotAudio(slotIdx) {
         const a = slotAudio[slotIdx];
-        if (a) { a.pause(); a.src = ''; slotAudio[slotIdx] = null; }
+        if (a) {
+            a._yayuePlayToken = null;
+            releasePreparedAudio(a);
+            slotAudio[slotIdx] = null;
+        }
         if (slots.length > 0 && slots.every(s => !s.data)) {
             stopClock();
             gTime = 0;
@@ -1813,7 +1973,7 @@
         if (paused) {
             if (a) a.pause();
         } else {
-            if (!hasPlayingInstrument(slotIdx)) gTime = 0;
+            if (!hasPlayingInstrument(slotIdx) && !hasWaitingInstrument(slotIdx)) gTime = 0;
             if (!gRunning) startClock();
             if (a) {
                 seekAndPlayAudio(a, slot.data.id, false);
@@ -1899,7 +2059,7 @@
         slot.paused = !slot.paused;
         if (!slot.paused) slot.waiting = false;
         toggleSlotAudio(slotIdx, slot.paused);
-        if (slot.paused && !hasPlayingInstrument()) {
+        if (slot.paused && !hasClockActiveInstrument()) {
             stopClock();
             gTime = 0;
             lastLoopIndex = 0;

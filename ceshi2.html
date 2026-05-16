@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>赤峰新声代 - 混音模拟器 (Canvas版)</title>
+    <title>赤雅新声代 - 混音模拟器 (Canvas版)</title>
     <style>
         body {
             margin: 0;
@@ -903,7 +903,7 @@
 
 <div id="page-splash" class="enabled">
     <div class="splash-center">
-        <div class="splash-title">赤峰新声代</div>
+        <div class="splash-title">赤雅新声代</div>
         <div class="splash-baseline">跟随节奏，编织雅乐</div>
         <div class="splash-experience">为了获得更好的体验，请佩戴耳机</div>
         <div class="splash-headphone" aria-hidden="true"></div>
@@ -1216,7 +1216,7 @@
         song1: {
             id: 'song1',
             switchLabel: '部分一',
-            title: '赤峰新声代 · 部分一',
+            title: '赤雅新声代 · 部分一',
             instruments: [
                 { id: 'snare', name: '大军鼓', color: '#c85d4f', family: 'percussion' },
                 { id: 'kick', name: '底鼓', color: '#d4834b', family: 'percussion' },
@@ -1285,7 +1285,7 @@
         song2: {
             id: 'song2',
             switchLabel: '部分二',
-            title: '赤峰新声代 · 部分二',
+            title: '赤雅新声代 · 部分二',
             instruments: [
                 { id: 'china_drum', name: '中国大鼓', color: '#bd604f', family: 'percussion' },
                 { id: 'double_bass_song2', name: '低音提琴', color: '#7d6a55', family: 'bass' },
@@ -2400,7 +2400,7 @@
         ctx.shadowBlur = 16;
         ctx.shadowColor = "rgba(212,175,55,0.18)";
         ctx.fillStyle = CONFIG.colors.gold;
-        ctx.fillText("赤 峰 新 声 代", CONFIG.width / 2, 88);
+        ctx.fillText("赤 雅 新 声 代", CONFIG.width / 2, 88);
         ctx.shadowBlur = 0;
         ctx.strokeStyle = "rgba(212,175,55,0.18)";
         ctx.lineWidth = 1;
@@ -3926,8 +3926,12 @@
         return /^(我的赤峰雅乐传承之路|我国最完整的雅乐|赤峰雅乐渊源|作者简介|赤峰雅乐传承工作取得的成绩|[一二三四五六七八九十]、|（[一二三四五六七八九十]+）)/.test(line);
     }
 
+    function normalizeHeritageArticleText(text) {
+        return String(text).replace(/^我国最完整的雅乐：赤峰雅乐-文[ \t]*李富-\n+/, '');
+    }
+
     function formatHeritageArticle(text) {
-        return String(text)
+        return normalizeHeritageArticleText(text)
             .split(/\n+/)
             .map(rawLine => rawLine.trim())
             .filter(Boolean)
